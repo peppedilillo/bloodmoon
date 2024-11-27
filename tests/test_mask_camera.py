@@ -18,11 +18,11 @@ class TestWFM(unittest.TestCase):
         self.assertFalse(self.wfm.detector_shape == self.wfm.mask_shape)
 
     def test_sky_bins(self):
-        bins_x, bins_y = self.wfm.bins_sky
-        assert len(np.unique(bins_x)) == len(bins_x)
-        assert len(np.unique(bins_y)) == len(bins_y)
-        assert len(np.unique(np.round(np.diff(bins_x), 7))) == 1
-        assert len(np.unique(np.round(np.diff(bins_y), 7))) == 1
+        xbins, ybins = self.wfm._bins_sky(self.wfm.upscale_f)
+        assert len(np.unique(xbins)) == len(xbins)
+        assert len(np.unique(ybins)) == len(ybins)
+        assert len(np.unique(np.round(np.diff(xbins), 7))) == 1
+        assert len(np.unique(np.round(np.diff(ybins), 7))) == 1
 
     def test_encode_shape(self):
         sky = np.zeros(self.wfm.sky_shape)
