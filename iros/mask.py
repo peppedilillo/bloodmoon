@@ -139,6 +139,65 @@ class CodedMaskCamera:
             raise ValueError("Upscale factors must be positive integers.")
         self.upscale_f = UpscaleFactor(*upscale_f)
 
+    def _bins_mask(self, upscale_f: UpscaleFactor, ) -> Bins2D:
+        """Generate binning structure for mask with given upscale factors."""
+        return Bins2D(
+            _bin(self.mdl["mask_minx"], self.mdl["mask_maxx"], self.mdl["mask_deltax"] / upscale_f.x),
+            _bin(self.mdl["mask_miny"], self.mdl["mask_maxy"], self.mdl["mask_deltay"] / upscale_f.y),
+        )
+
+    @property
+    def bins_mask(self) -> dict[str, np.array]:
+        """Binning structure for the mask pattern."""
+        return self._bins_mask(self.upscale_f)._asdict()
+
+    def _bins_detector(self, upscale_f: UpscaleFactor) -> Bins2D:
+        """Generate binning structure for detector with given upscale factors."""
+        bins = self._bins_mask(self.upscale_f)
+        return Bins2D(
+            _bin(
+                bins.x[bisect_right(bins.x, self.mdl["detector_minx"]) - 1],
+                bins.x[bisect_left(bins.x, self.mdl["detector_maxx"])],
+                self.mdl["mask_deltax"] / upscale_f.x,
+            ),
+            _bin(
+                bins.y[bisect_right(bins.y, self.mdl["detector_miny"]) - 1],
+                bins.y[bisect_left(bins.y, self.mdl["detector_maxy"])],
+                self.mdl["mask_deltay"] / upscale_f.y,
+            ),
+        )
+
+    @property
+    def bins_detector(self) -> dict[str, np.array]:
+        """Binning structure for the detector."""
+        return self._bins_detector(self.upscale_f)._asdict()
+
+    def _bins_sky(self, upscale_f: UpscaleFactor) -> Bins2D:
+        """Binning structure for the reconstructed sky image."""
+        o, p = self.mask_shape
+        bins = self._bins_detector(upscale_f)
+        binstep, nbins = bins.x[1] - bins.x[0], o // 2 - 1
+        xbins = np.concatenate(
+            (
+                np.linspace(bins.x[0] - (nbins + 1) * binstep, bins.x[-0] - binstep, nbins + 1),
+                bins.x,
+                np.linspace(bins.x[-1] + binstep, bins.x[-1] + nbins * binstep, nbins),
+            )
+        )
+        binstep, nbins = bins.y[1] - bins.y[0], p // 2 - 1
+        ybins = np.concatenate(
+            (
+                np.linspace(bins.y[0] - (nbins + 1) * binstep, bins.y[-0] - binstep, nbins + 1),
+                bins.y,
+                np.linspace(bins.y[-1] + binstep, bins.y[-1] + nbins * binstep, nbins),
+            )
+        )
+        return Bins2D(x=xbins, y=ybins)
+
+    @property
+    def bins_sky(self) -> dict[str, np.array]:
+        return self._bins_sky(self.upscale_f)._asdict()
+
     @cached_property
     def mask(self) -> np.array:
         """2D array representing the coded mask pattern."""
@@ -162,66 +221,12 @@ class CodedMaskCamera:
         """2D array representing the correlation between decoder and bulk patterns."""
         return correlate(self.decoder, self.bulk, mode="full")
 
-    def _bins_mask(self, upscale_f: UpscaleFactor,) -> Bins2D:
-        """Generate binning structure for mask with given upscale factors."""
-        return Bins2D(
-            _bin(self.mdl["mask_minx"], self.mdl["mask_maxx"], self.mdl["mask_deltax"] / upscale_f.x),
-            _bin(self.mdl["mask_miny"], self.mdl["mask_maxy"], self.mdl["mask_deltay"] / upscale_f.y),
-        )
-
-    @property
-    def bins_mask(self) -> Bins2D:
-        """Binning structure for the mask pattern."""
-        return self._bins_mask(self.upscale_f)
-
-    def _bins_detector(self, upscale_f: UpscaleFactor) -> Bins2D:
-        """Generate binning structure for detector with given upscale factors."""
-        return Bins2D(
-            _bin(
-                self.bins_mask.x[bisect_right(self.bins_mask.x, self.mdl["detector_minx"]) - 1],
-                self.bins_mask.x[bisect_left(self.bins_mask.x, self.mdl["detector_maxx"])],
-                self.mdl["mask_deltax"] / upscale_f.x,
-            ),
-            _bin(
-                self.bins_mask.y[bisect_right(self.bins_mask.y, self.mdl["detector_miny"]) - 1],
-                self.bins_mask.y[bisect_left(self.bins_mask.y, self.mdl["detector_maxy"])],
-                self.mdl["mask_deltay"] / upscale_f.y,
-            ),
-        )
-        
-    @property
-    def bins_detector(self) -> Bins2D:
-        """Binning structure for the detector."""
-        return self._bins_detector(self.upscale_f)
-
-    @property
-    def bins_sky(self) -> Bins2D:
-        """Binning structure for the reconstructed sky image."""
-        o, p = self.mask_shape
-        xbins_detector, ybins_detector = self.bins_detector
-        binstep, nbins = xbins_detector[1] - xbins_detector[0], o // 2 - 1
-        xbins = np.concatenate(
-            (
-                np.linspace(xbins_detector[0] - (nbins + 1) * binstep, xbins_detector[-0] - binstep, nbins + 1),
-                xbins_detector,
-                np.linspace(xbins_detector[-1] + binstep, xbins_detector[-1] + nbins * binstep, nbins),
-            )
-        )
-        binstep, nbins = ybins_detector[1] - ybins_detector[0], p // 2 - 1
-        ybins = np.concatenate(
-            (
-                np.linspace(ybins_detector[0] - (nbins + 1) * binstep, ybins_detector[-0] - binstep, nbins + 1),
-                ybins_detector,
-                np.linspace(ybins_detector[-1] + binstep, ybins_detector[-1] + nbins * binstep, nbins),
-            )
-        )
-        return Bins2D(x=xbins, y=ybins)
-
     @property
     def detector_shape(self) -> tuple[int, int]:
         """Shape of the detector array (rows, columns)."""
-        xlen = self.bins_mask.x[bisect_left(self.bins_mask.x, self.mdl["detector_maxx"])] - self.bins_mask.x[bisect_right(self.bins_mask.x, self.mdl["detector_minx"]) - 1]
-        ylen = self.bins_mask.y[bisect_left(self.bins_mask.y, self.mdl["detector_maxy"])] - self.bins_mask.y[bisect_right(self.bins_mask.y, self.mdl["detector_miny"]) - 1]
+        bins = self._bins_mask(self.upscale_f)
+        xlen = bins.x[bisect_left(bins.x, self.mdl["detector_maxx"])] - bins.x[bisect_right(bins.x, self.mdl["detector_minx"]) - 1]
+        ylen = bins.y[bisect_left(bins.y, self.mdl["detector_maxy"])] - bins.y[bisect_right(bins.y, self.mdl["detector_miny"]) - 1]
         return (
             int(ylen / (self.mdl["mask_deltay"] / self.upscale_f.y)),
             int(xlen / (self.mdl["mask_deltax"] / self.upscale_f.x)),
