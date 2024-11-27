@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "iros"
+version = "0.0.1"
+authors = [
+    { name="Giuseppe Dilillo", email="peppedilillo@gmail.com" },
+]
+requires-python = ">=3.12"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "numpy",
+	"pandas",
+    "matplotlib",
+    "astropy",
+    "scipy",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "isort",
+    "ipython",
+    "jupyter",
+]
+
