@@ -103,7 +103,8 @@ class ObservationDataLoader:
             },
         }
 
-    def get_detected_data(self) -> dict[str, FITS_rec]:
+    @property
+    def detected(self) -> dict[str, FITS_rec]:
         """
         Load photons data without plane position reconstruction effects from both cameras.
 
@@ -112,7 +113,8 @@ class ObservationDataLoader:
         """
         return _get_simulation_fits_data(self.simulation_files, "detected", headers=False)
 
-    def get_reconstructed_data(self) -> dict[str, FITS_rec]:
+    @property
+    def reconstructed(self) -> dict[str, FITS_rec]:
         """
         Load reconstructed photons data from both cameras.
 
@@ -121,7 +123,8 @@ class ObservationDataLoader:
         """
         return _get_simulation_fits_data(self.simulation_files, "reconstructed", headers=False)
 
-    def get_source_data(self) -> dict[str, FITS_rec]:
+    @property
+    def source(self) -> dict[str, FITS_rec]:
         """
         Load source data from both cameras.
 
@@ -130,7 +133,8 @@ class ObservationDataLoader:
         """
         return _get_simulation_fits_data(self.simulation_files, "sources", headers=False)
 
-    def get_detected_header(self) -> dict[str, Header]:
+    @property
+    def header_detected(self) -> dict[str, Header]:
         """
         Load FITS headers from detected plane files for both cameras.
 
@@ -139,7 +143,8 @@ class ObservationDataLoader:
         """
         return _get_simulation_fits_data(self.simulation_files, "detected", headers=True)
 
-    def get_reconstructed_header(self) -> dict[str, Header]:
+    @property
+    def header_reconstructed(self) -> dict[str, Header]:
         """
         Load FITS headers from reconstructed files for both cameras.
 
@@ -148,7 +153,8 @@ class ObservationDataLoader:
         """
         return _get_simulation_fits_data(self.simulation_files, "reconstructed", headers=True)
 
-    def get_source_header(self) -> dict[str, Header]:
+    @property
+    def header_source(self) -> dict[str, Header]:
         """
         Load FITS headers from source files for both cameras.
 
@@ -205,7 +211,8 @@ class MaskDataLoader:
             }.items()
         }
 
-    def get_mask_data(self) -> fits.FITS_rec:
+    @property
+    def mask(self) -> fits.FITS_rec:
         """
         Load mask data from mask FITS file.
 
@@ -214,7 +221,8 @@ class MaskDataLoader:
         """
         return fits.getdata(self.filepath, ext=2)
 
-    def get_decoder_data(self) -> fits.FITS_rec:
+    @property
+    def decoder(self) -> fits.FITS_rec:
         """
         Load decoder data from mask FITS file.
 
@@ -223,7 +231,8 @@ class MaskDataLoader:
         """
         return fits.getdata(self.filepath, ext=3)
 
-    def get_bulk_data(self) -> fits.FITS_rec:
+    @property
+    def bulk(self) -> fits.FITS_rec:
         """
         Load bulk data from mask FITS file.
 
@@ -232,7 +241,8 @@ class MaskDataLoader:
         """
         return fits.getdata(self.filepath, ext=4)
 
-    def get_mask_header(self) -> fits.Header:
+    @property
+    def header_mask(self) -> fits.Header:
         """
         Load mask header from mask FITS file.
 
@@ -241,7 +251,8 @@ class MaskDataLoader:
         """
         return fits.getheader(self.filepath, ext=2)
 
-    def get_decoder_header(self) -> fits.Header:
+    @property
+    def header_decoder(self) -> fits.Header:
         """
         Load decoder header from mask FITS file.
 
@@ -250,7 +261,8 @@ class MaskDataLoader:
         """
         return fits.getheader(self.filepath, ext=3)
 
-    def get_bulk_header(self) -> fits.Header:
+    @property
+    def header_bulk(self) -> fits.Header:
         """
         Load bulk header from mask FITS file.
 

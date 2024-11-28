@@ -207,17 +207,17 @@ class CodedMaskCamera:
     @cached_property
     def mask(self) -> np.array:
         """2D array representing the coded mask pattern."""
-        return _upscale(_fold(self.mdl.get_mask_data(), self._bins_mask(UpscaleFactor(1, 1))).astype(int), self.upscale_f)
+        return _upscale(_fold(self.mdl.mask, self._bins_mask(UpscaleFactor(1, 1))).astype(int), self.upscale_f)
 
     @cached_property
     def decoder(self) -> np.array:
         """2D array representing the mask pattern used for decoding."""
-        return _upscale(_fold(self.mdl.get_decoder_data(), self._bins_mask(UpscaleFactor(1, 1))), self.upscale_f)
+        return _upscale(_fold(self.mdl.decoder, self._bins_mask(UpscaleFactor(1, 1))), self.upscale_f)
 
     @cached_property
     def bulk(self) -> np.array:
         """2D array representing the bulk (sensitivity) array of the mask."""
-        framed_bulk = _fold(self.mdl.get_bulk_data(), self._bins_mask(UpscaleFactor(1, 1)))
+        framed_bulk = _fold(self.mdl.bulk, self._bins_mask(UpscaleFactor(1, 1)))
         framed_bulk[~np.isclose(framed_bulk, np.zeros_like(framed_bulk))] = 1
         bins = self._bins_mask(self.upscale_f)
         xmin, xmax = bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
