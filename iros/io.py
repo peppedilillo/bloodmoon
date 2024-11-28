@@ -1,6 +1,6 @@
+from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
-from dataclasses import dataclass
 
 from astropy.io import fits
 from astropy.io.fits.fitsrec import FITS_rec
@@ -30,7 +30,7 @@ def _get_simulation_fits_data(filedict: dict, kind: str, headers: bool = False) 
 
 
 @dataclass(frozen=True)
-class ObservationDataLoader:
+class SimulationDataLoader:
     """
     An immutable dataclass for loading WFM simulation data from FITS files.
 
@@ -39,10 +39,10 @@ class ObservationDataLoader:
     these files, as well as pointing information for the cameras in those simulations.
 
     Attributes:
-        root: Root directory containing the simulation data files
+        root: Path to root directory containing the simulation data files
     """
 
-    root: str
+    root: Path
 
     @cached_property
     def simulation_files(self):
@@ -63,21 +63,22 @@ class ObservationDataLoader:
                 raise ValueError(f"A file matching the pattern {str(parent / pattern)} is expected but missing.")
             f, *extra_matches = matches
             if extra_matches:
-                raise ValueError(f"Found unexpected extra matches for glob pattern {str(parent / pattern)}." f"File with pattern {pattern} should be unique")
+                raise ValueError(
+                    f"Found unexpected extra matches for glob pattern {str(parent / pattern)}."
+                    f"File with pattern {pattern} should be unique"
+                )
             return f
-
-        rp = Path(self.root)
 
         return {
             "cam1a": {
-                "detected": check_and_pick(rp, "cam1a/*detected_plane.fits"),
-                "reconstructed": check_and_pick(rp, "cam1a/*reconstructed.fits"),
-                "sources": check_and_pick(rp, "cam1a/*sources.fits"),
+                "detected": check_and_pick(self.root, "cam1a/*detected_plane.fits"),
+                "reconstructed": check_and_pick(self.root, "cam1a/*reconstructed.fits"),
+                "sources": check_and_pick(self.root, "cam1a/*sources.fits"),
             },
             "cam1b": {
-                "detected": check_and_pick(rp, "cam1b/*detected_plane.fits"),
-                "reconstructed": check_and_pick(rp, "cam1b/*reconstructed.fits"),
-                "sources": check_and_pick(rp, "cam1b/*sources.fits"),
+                "detected": check_and_pick(self.root, "cam1b/*detected_plane.fits"),
+                "reconstructed": check_and_pick(self.root, "cam1b/*reconstructed.fits"),
+                "sources": check_and_pick(self.root, "cam1b/*sources.fits"),
             },
         }
 
@@ -164,6 +165,22 @@ class ObservationDataLoader:
         return _get_simulation_fits_data(self.simulation_files, "sources", headers=True)
 
 
+def fetch_simulation(data_root: str | Path):
+    """
+    Checks data and intializes MaskDataLoader.
+
+    Args:
+        data_root: path to mask FITS file.
+
+    Returns:
+        a MaskDataLoader dataclass.
+    """
+    dr = Path(data_root)
+    if not dr.is_dir():
+        raise NotADirectoryError("The simulation path is not a directory.")
+    return SimulationDataLoader(Path(data_root))
+
+
 @dataclass(frozen=True)
 class MaskDataLoader:
     """
@@ -171,19 +188,14 @@ class MaskDataLoader:
     Handles mask parameters and various data extensions (mask, decoder, and bulk data).
 
     Attributes:
-        file: String path to mask file
+        filepath: path to mask file
     """
 
-    file: str
+    filepath: Path
 
     def __getitem__(self, key: str) -> float:
         """Access mask parameters via dictionary-style lookup."""
         return self.parameters[key]
-
-    @cached_property
-    def filepath(self) -> Path:
-        """Convert file string to Path object."""
-        return Path(self.file)
 
     @cached_property
     def parameters(self) -> dict[str, float]:
@@ -270,3 +282,38 @@ class MaskDataLoader:
             FITS header containing bulk data
         """
         return fits.getheader(self.filepath, ext=4)
+
+
+def fetch_mask(filepath: str | Path) -> MaskDataLoader:
+    """
+    Checks data and intializes MaskDataLoader.
+
+    Args:
+        filepath: path to mask FITS file.
+
+    Returns:
+        a MaskDataLoader dataclass.
+    """
+    fp = Path(filepath)
+    if not fp.is_file():
+        raise FileNotFoundError("Mask file does not exists")
+    return MaskDataLoader(Path(filepath))
+
+
+"""
+ain't all these 
+dataclasses
+too much?
+⠀⠀⠀⠀⠀⠀⣀⣠⣤⣤⣤⣤⣀⡀
+⠀⠀⠀⣠⡶⡿⢿⣿⣛⣟⣿⡿⢿⢿⣷⣦⡀
+⠀⢰⣯⣷⣿⣿⣿⢟⠃⢿⣟⣿⣿⣾⣷⣽⣺⢆⠀
+⠀⢸⣿⢿⣾⢧⣏⡴⠀⠈⢿⣘⣿⢿⣿⣿⣿⣿⡆
+⠀⢹⣿⢠⡶⠒⢶⠀⠀⣠⠒⠒⠢⡀⢿⣿⣿⣿⡇
+⠀⣿⣿⠸⣄⣠⡾⠀⠀⠻⣀⣀⡼⠁⢸⣿⣿⣿⣿
+⠀⣿⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⣿⣿⣿⣿
+⢰⣿⣿⠀⠀⠀⡔⠢⠤⠔⠒⢄⠀⠀⢸⣿⣿⣿⣿⡇
+⢸⣿⣿⣄⠀⠸⡀⠀⠀⠀⠀⢀⡇⠠⣸⣿⣿⣿⣿⡇
+⢸⣿⣿⣿⣷⣦⣮⣉⢉⠉⠩⠄⢴⣾⣿⣿⣿⣿⡇
+⢸⣿⣿⢻⣿⣟⢟⡁⠀⠀⠀⠀⢇⠻⣿⣿⣿⣿⣿
+⢸⠿⣿⡈⠋⠀⠀⡇⠀⠀⠀⢰⠃⢠⣿⡟⣿⣿⢻ 
+"""

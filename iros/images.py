@@ -3,7 +3,9 @@ from typing import Callable, Optional
 import numpy as np
 
 
-def compose(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, Callable[[int, int], tuple[Optional[tuple[int, int]], Optional[tuple[int, int]]]]]:
+def compose(
+    a: np.ndarray, b: np.ndarray
+) -> tuple[np.ndarray, Callable[[int, int], tuple[Optional[tuple[int, int]], Optional[tuple[int, int]]]]]:
     """
     Composes two matrices `a` and `b` into one square embedding.
     The `b` matrix is rotated by 90 degree *clockwise*,
@@ -67,7 +69,7 @@ def compose(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, Callable[[int, in
     composed = a_embedding + b_embedding
 
     def _rotb2b(i, j):
-        return  mind - 1 - j, i
+        return mind - 1 - j, i
 
     def f(i: int, j: int) -> tuple[Optional[tuple[int, int]], Optional[tuple[int, int]]]:
         """

@@ -1,12 +1,8 @@
-from contextlib import (
-    contextmanager,
-)
+from contextlib import contextmanager
 
 
 @contextmanager
-def catchtime(
-    label: str
-) -> Callable[[], float]:
+def catchtime(label: str) -> Callable[[], float]:
     """A context manager for measuring processing times."""
     t1 = t2 = perf_counter()
     yield lambda: t2 - t1

@@ -20,12 +20,7 @@ class TestCompose(unittest.TestCase):
         self.assertEqual(pos_a, (0, 1))
         self.assertEqual(pos_b, (1, 1))
 
-        expected = np.array([
-            [0,  13, 9,  0],
-            [1, 2+14, 3+10, 4],
-            [5, 6+15, 7+11, 8],
-            [0, 16, 12,  0]
-        ])
+        expected = np.array([[0, 13, 9, 0], [1, 2 + 14, 3 + 10, 4], [5, 6 + 15, 7 + 11, 8], [0, 16, 12, 0]])
         np.testing.assert_array_equal(composed, expected)
 
     def test_compose_square(self):
@@ -35,10 +30,12 @@ class TestCompose(unittest.TestCase):
         self.assertEqual(pos_a, (0, 0))
         self.assertEqual(pos_b, (1, 0))
 
-        expected = np.array([
-            [1+2, 2+1],
-            [3+4, 4+3],
-        ])
+        expected = np.array(
+            [
+                [1 + 2, 2 + 1],
+                [3 + 4, 4 + 3],
+            ]
+        )
         np.testing.assert_array_equal(composed, expected)
 
     def test_compose_mapping(self):

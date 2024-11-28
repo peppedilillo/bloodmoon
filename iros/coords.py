@@ -2,8 +2,8 @@ import numpy as np
 
 
 def get_rotation_matrices(
-        pointing_radec_z: tuple[float, float] | np.array,
-        pointing_radec_x: tuple[float, float] | np.array,
+    pointing_radec_z: tuple[float, float] | np.array,
+    pointing_radec_x: tuple[float, float] | np.array,
 ) -> tuple[np.array, np.array]:
     """
     Calculates rotation matrices between Earth equatorial and camera reference frames.
@@ -47,24 +47,18 @@ def get_rotation_matrices(
     phi_x = np.deg2rad(ra_x)
 
     sin_theta_x = np.sin(theta_x)
-    x_axis = np.array([
-        sin_theta_x * np.cos(phi_x),
-        sin_theta_x * np.sin(phi_x),
-        np.cos(theta_x)
-    ])
+    x_axis = np.array([sin_theta_x * np.cos(phi_x), sin_theta_x * np.sin(phi_x), np.cos(theta_x)])
 
     sin_theta_z = np.sin(theta_z)
-    z_axis = np.array([
-        sin_theta_z * np.cos(phi_z),
-        sin_theta_z * np.sin(phi_z),
-        np.cos(theta_z)
-    ])
+    z_axis = np.array([sin_theta_z * np.cos(phi_z), sin_theta_z * np.sin(phi_z), np.cos(theta_z)])
 
-    y_axis = np.array([
-        z_axis[1] * x_axis[2] - z_axis[2] * x_axis[1],
-        z_axis[2] * x_axis[0] - z_axis[0] * x_axis[2],
-        z_axis[0] * x_axis[1] - z_axis[1] * x_axis[0],
-    ])
+    y_axis = np.array(
+        [
+            z_axis[1] * x_axis[2] - z_axis[2] * x_axis[1],
+            z_axis[2] * x_axis[0] - z_axis[0] * x_axis[2],
+            z_axis[0] * x_axis[1] - z_axis[1] * x_axis[0],
+        ]
+    )
 
     rotmat_sky2cam = np.vstack((x_axis, y_axis, z_axis))
     rotmat_cam2sky = rotmat_sky2cam.T
@@ -73,11 +67,11 @@ def get_rotation_matrices(
 
 
 def to_sky_coordinates(
-        midpoints_xs: np.array,
-        midpoints_ys: np.array,
-        pointing_radec_z: tuple[float, float],
-        pointing_radec_x: tuple[float, float],
-        distance_detector_mask: float,
+    midpoints_xs: np.array,
+    midpoints_ys: np.array,
+    pointing_radec_z: tuple[float, float],
+    pointing_radec_x: tuple[float, float],
+    distance_detector_mask: float,
 ) -> tuple[np.array, np.array]:
     """
     Converts detector plane coordinates to equatorial sky coordinates (RA/Dec).
@@ -116,12 +110,17 @@ def to_sky_coordinates(
         - The output RA values are normalized to [0, 360) degrees
         - The output Dec values are in the range [-90, 90] degrees
     """
-    rotmat_sky2cam, rotmat_cam2sky = get_rotation_matrices(pointing_radec_z, pointing_radec_x,)
+    rotmat_sky2cam, rotmat_cam2sky = get_rotation_matrices(
+        pointing_radec_z,
+        pointing_radec_x,
+    )
     # point distances from the mask center.
-    r = np.sqrt(midpoints_xs * midpoints_xs + midpoints_ys * midpoints_ys + distance_detector_mask * distance_detector_mask)
+    r = np.sqrt(
+        midpoints_xs * midpoints_xs + midpoints_ys * midpoints_ys + distance_detector_mask * distance_detector_mask
+    )
     # these are the versors from the mask center to the detector elements
-    versors_local_xs = - midpoints_xs / r
-    versors_local_ys = - midpoints_ys / r
+    versors_local_xs = -midpoints_xs / r
+    versors_local_ys = -midpoints_ys / r
     versors_local_zs = distance_detector_mask / r
     # this multiplies all detector vectors with the rotation matrix
     _v = np.hstack(
@@ -142,9 +141,9 @@ def to_sky_coordinates(
 
 
 def to_angles(
-        midpoints_xs: np.array,
-        midpoints_ys: np.array,
-        distance_detector_mask: float,
+    midpoints_xs: np.array,
+    midpoints_ys: np.array,
+    distance_detector_mask: float,
 ) -> tuple[np.array, np.array]:
     """
     Expresses the mask elements in terms of angle between them and the detector center.

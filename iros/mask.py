@@ -1,13 +1,14 @@
-from typing import NamedTuple
-from bisect import bisect_left, bisect_right
-from functools import cached_property
+from bisect import bisect_left
+from bisect import bisect_right
 from dataclasses import dataclass
+from functools import cached_property
 from pathlib import Path
+from typing import NamedTuple
 
-import numpy as np
 from astropy.io.fits.fitsrec import FITS_rec
-from scipy.stats import binned_statistic_2d
+import numpy as np
 from scipy.signal import correlate
+from scipy.stats import binned_statistic_2d
 
 from .io import MaskDataLoader
 
@@ -19,6 +20,7 @@ class Bins2D(NamedTuple):
         x: Array of x-coordinate bin edges
         y: Array of y-coordinate bin edges
     """
+
     x: np.array
     y: np.array
 
@@ -48,6 +50,7 @@ class UpscaleFactor(NamedTuple):
         x: Upscaling factor for x dimension
         y: Upscaling factor for y dimension
     """
+
     x: int
     y: int
 
@@ -76,7 +79,10 @@ def _upscale(
     return m
 
 
-def _fold(ml: FITS_rec, mask_bins: Bins2D,) -> np.array:
+def _fold(
+    ml: FITS_rec,
+    mask_bins: Bins2D,
+) -> np.array:
     """Convert mask data from FITS record to 2D binned array.
 
     Args:
@@ -89,25 +95,7 @@ def _fold(ml: FITS_rec, mask_bins: Bins2D,) -> np.array:
     return binned_statistic_2d(ml["X"], ml["Y"], ml["VAL"], statistic="max", bins=[mask_bins.x, mask_bins.y])[0].T
 
 
-def _resize(a: np.array, b: np.array,) -> np.array:
-    """Resizes the `a` matrix to the size of the smallest submatrix of `b` with non-zero border"
-
-    Args:
-        a: Array to be resized
-        b: Reference array defining the non-zero border
-
-    Returns:
-        Resized submatrix of input array
-    """
-    non_zero_rows = np.where(b.any(axis=1))[0]
-    non_zero_cols = np.where(b.any(axis=0))[0]
-    row_start, row_end = non_zero_rows[0], non_zero_rows[-1] + 1
-    col_start, col_end = non_zero_cols[0], non_zero_cols[-1] + 1
-    submatrix = a[row_start:row_end, col_start:col_end]
-    return submatrix
-
-
-def bisect_interval(a: np.array, start: float, stop: float):
+def _bisect_interval(a: np.array, start: float, stop: float):
     """
     Given a monotonically increasing array of floats and a float interval (start, stop)
     in it, returns the indices of the smallest sub array containing the interval.
@@ -135,6 +123,20 @@ def bisect_interval(a: np.array, start: float, stop: float):
     return bisect_right(a, start) - 1, bisect_left(a, stop)
 
 
+"""
+last one 
+i swear
+
+　　　 　　／＞　　フ
+　　　 　　| 　_　 _ l
+　 　　 　／` ミ＿xノ
+　　 　 /　　　 　 |
+　　　 /　 ヽ　　 ﾉ
+　 　 │　　|　|　|
+　／￣|　　 |　|　|
+　| (￣ヽ＿_ヽ_)__) """
+
+
 @dataclass(frozen=True)
 class CodedMaskCamera:
     """Class representing a coded mask camera system.
@@ -148,10 +150,14 @@ class CodedMaskCamera:
     Raises:
         ValueError: If detector plane is larger than mask or if upscale factors are not positive
     """
+
     mdl: MaskDataLoader
     upscale_f: UpscaleFactor
 
-    def _bins_mask(self, upscale_f: UpscaleFactor, ) -> Bins2D:
+    def _bins_mask(
+        self,
+        upscale_f: UpscaleFactor,
+    ) -> Bins2D:
         """Generate binning structure for mask with given upscale factors."""
         return Bins2D(
             _bin(self.mdl["mask_minx"], self.mdl["mask_maxx"], self.mdl["mask_deltax"] / upscale_f.x),
@@ -166,8 +172,8 @@ class CodedMaskCamera:
     def _bins_detector(self, upscale_f: UpscaleFactor) -> Bins2D:
         """Generate binning structure for detector with given upscale factors."""
         bins = self._bins_mask(self.upscale_f)
-        xmin, xmax = bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
-        ymin, ymax = bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
+        xmin, xmax = _bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
+        ymin, ymax = _bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
         return Bins2D(
             _bin(bins.x[xmin], bins.x[xmax], self.mdl["mask_deltax"] / upscale_f.x),
             _bin(bins.y[ymin], bins.y[ymax], self.mdl["mask_deltay"] / upscale_f.y),
@@ -220,8 +226,8 @@ class CodedMaskCamera:
         framed_bulk = _fold(self.mdl.bulk, self._bins_mask(UpscaleFactor(1, 1)))
         framed_bulk[~np.isclose(framed_bulk, np.zeros_like(framed_bulk))] = 1
         bins = self._bins_mask(self.upscale_f)
-        xmin, xmax = bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
-        ymin, ymax = bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
+        xmin, xmax = _bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
+        ymin, ymax = _bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
         return _upscale(framed_bulk, self.upscale_f)[ymin:ymax, xmin:xmax]
 
     @cached_property
@@ -254,7 +260,7 @@ class CodedMaskCamera:
         return n + o - 1, m + p - 1
 
 
-def get_coded_mask_camera(
+def fetch_camera(
     mask_filepath: str | Path,
     upscale_f: tuple[int, int] = (1, 1),
 ) -> CodedMaskCamera:
@@ -317,7 +323,9 @@ def decode(camera: CodedMaskCamera, detector: np.array) -> tuple[np.array, np.ar
     var = correlate(np.square(camera.decoder), detector, mode="full")
     sum_det, sum_bulk = map(np.sum, (detector, camera.bulk))
     cc_bal = cc - camera.balancing * sum_det / sum_bulk
-    var_bal = var + np.square(camera.balancing) * sum_det / np.square(sum_bulk) ** 2 - 2 * cc * camera.balancing / sum_bulk
+    var_bal = (
+        var + np.square(camera.balancing) * sum_det / np.square(sum_bulk) ** 2 - 2 * cc * camera.balancing / sum_bulk
+    )
     return cc_bal, var_bal
 
 
