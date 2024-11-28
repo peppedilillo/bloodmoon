@@ -1,12 +1,13 @@
-from typing import NamedTuple, Callable, Optional
+from typing import NamedTuple
 from bisect import bisect_left, bisect_right
 from functools import cached_property
+from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 from astropy.io.fits.fitsrec import FITS_rec
 from scipy.stats import binned_statistic_2d
 from scipy.signal import correlate
-
 
 from .io import MaskDataLoader
 
@@ -106,38 +107,49 @@ def _resize(a: np.array, b: np.array,) -> np.array:
     return submatrix
 
 
+def bisect_interval(a: np.array, start: float, stop: float):
+    """
+    Given a monotonically increasing array of floats and a float interval (start, stop)
+    in it, returns the indices of the smallest sub array containing the interval.
+
+    Args:
+        a (np.array): A monotonically increasing array of floats.
+        start (float): The lower bound of the interval. Must be greater than or equal to
+            the first element of the array.
+        stop (float): The upper bound of the interval. Must be less than or equal to
+            the last element of the array.
+
+    Returns:
+        tuple: A pair of integers (left_idx, right_idx) where:
+            - left_idx is the index of the largest value in 'a' that is less than or equal to 'start'
+            - right_idx is the index of the smallest value in 'a' that is greater than or equal to 'stop'
+
+    Raises:
+        ValueError: If the interval [start, stop] is not contained within the array bounds
+            or if the input array is not monotonically increasing.
+    """
+    if not (start >= a[0] and stop <= a[-1]):
+        raise ValueError("The interval isn't contained in the input array")
+    if not np.all(np.diff(a) > 0):
+        raise ValueError("The array isn't monotonically increasing")
+    return bisect_right(a, start) - 1, bisect_left(a, stop)
+
+
+@dataclass(frozen=True)
 class CodedMaskCamera:
     """Class representing a coded mask camera system.
 
     Handles mask pattern, detector geometry, and related calculations for coded mask imaging.
 
     Args:
-        mask_data: Loader object containing mask and detector specifications
+        mdl: Mask data loader object containing mask and detector specifications
         upscale_f: Tuple of upscaling factors for x and y dimensions
 
     Raises:
         ValueError: If detector plane is larger than mask or if upscale factors are not positive
     """
-    def __init__(
-        self,
-        mask_data: MaskDataLoader,
-        upscale_f: tuple[int, int] = (1, 1),
-    ):
-        # guarantee that the bisect operation just below are performed on well suited arrays.
-        if not (
-            # fmt: off
-            mask_data["detector_minx"] >= mask_data["mask_minx"] and
-            mask_data["detector_maxx"] <= mask_data["mask_maxx"] and
-            mask_data["detector_miny"] >= mask_data["mask_miny"] and
-            mask_data["detector_maxy"] <= mask_data["mask_maxy"]
-            # fmt: on
-        ):
-            raise ValueError("Detector plane is larger than mask.")
-        self.mdl = mask_data
-
-        if not (upscale_f[0] > 0 and upscale_f[1] > 0):
-            raise ValueError("Upscale factors must be positive integers.")
-        self.upscale_f = UpscaleFactor(*upscale_f)
+    mdl: MaskDataLoader
+    upscale_f: UpscaleFactor
 
     def _bins_mask(self, upscale_f: UpscaleFactor, ) -> Bins2D:
         """Generate binning structure for mask with given upscale factors."""
@@ -147,30 +159,24 @@ class CodedMaskCamera:
         )
 
     @property
-    def bins_mask(self) -> dict[str, np.array]:
+    def bins_mask(self) -> Bins2D:
         """Binning structure for the mask pattern."""
-        return self._bins_mask(self.upscale_f)._asdict()
+        return self._bins_mask(self.upscale_f)
 
     def _bins_detector(self, upscale_f: UpscaleFactor) -> Bins2D:
         """Generate binning structure for detector with given upscale factors."""
         bins = self._bins_mask(self.upscale_f)
+        xmin, xmax = bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
+        ymin, ymax = bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
         return Bins2D(
-            _bin(
-                bins.x[bisect_right(bins.x, self.mdl["detector_minx"]) - 1],
-                bins.x[bisect_left(bins.x, self.mdl["detector_maxx"])],
-                self.mdl["mask_deltax"] / upscale_f.x,
-            ),
-            _bin(
-                bins.y[bisect_right(bins.y, self.mdl["detector_miny"]) - 1],
-                bins.y[bisect_left(bins.y, self.mdl["detector_maxy"])],
-                self.mdl["mask_deltay"] / upscale_f.y,
-            ),
+            _bin(bins.x[xmin], bins.x[xmax], self.mdl["mask_deltax"] / upscale_f.x),
+            _bin(bins.y[ymin], bins.y[ymax], self.mdl["mask_deltay"] / upscale_f.y),
         )
 
     @property
-    def bins_detector(self) -> dict[str, np.array]:
+    def bins_detector(self) -> Bins2D:
         """Binning structure for the detector."""
-        return self._bins_detector(self.upscale_f)._asdict()
+        return self._bins_detector(self.upscale_f)
 
     def _bins_sky(self, upscale_f: UpscaleFactor) -> Bins2D:
         """Binning structure for the reconstructed sky image."""
@@ -195,8 +201,8 @@ class CodedMaskCamera:
         return Bins2D(x=xbins, y=ybins)
 
     @property
-    def bins_sky(self) -> dict[str, np.array]:
-        return self._bins_sky(self.upscale_f)._asdict()
+    def bins_sky(self) -> Bins2D:
+        return self._bins_sky(self.upscale_f)
 
     @cached_property
     def mask(self) -> np.array:
@@ -206,15 +212,17 @@ class CodedMaskCamera:
     @cached_property
     def decoder(self) -> np.array:
         """2D array representing the mask pattern used for decoding."""
-        return _upscale(_fold(self.mdl.get_decoder_data(), self._bins_mask(UpscaleFactor(1, 1))).astype(int), self.upscale_f)
+        return _upscale(_fold(self.mdl.get_decoder_data(), self._bins_mask(UpscaleFactor(1, 1))), self.upscale_f)
 
     @cached_property
     def bulk(self) -> np.array:
         """2D array representing the bulk (sensitivity) array of the mask."""
         framed_bulk = _fold(self.mdl.get_bulk_data(), self._bins_mask(UpscaleFactor(1, 1)))
-        # this is a temporary fix for the fact that the bulk may contain non-integer value at border
         framed_bulk[~np.isclose(framed_bulk, np.zeros_like(framed_bulk))] = 1
-        return _upscale(_resize(framed_bulk, framed_bulk), self.upscale_f)
+        bins = self._bins_mask(self.upscale_f)
+        xmin, xmax = bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
+        ymin, ymax = bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
+        return _upscale(framed_bulk, self.upscale_f)[ymin:ymax, xmin:xmax]
 
     @cached_property
     def balancing(self) -> np.array:
@@ -224,13 +232,11 @@ class CodedMaskCamera:
     @property
     def detector_shape(self) -> tuple[int, int]:
         """Shape of the detector array (rows, columns)."""
-        bins = self._bins_mask(self.upscale_f)
-        xlen = bins.x[bisect_left(bins.x, self.mdl["detector_maxx"])] - bins.x[bisect_right(bins.x, self.mdl["detector_minx"]) - 1]
-        ylen = bins.y[bisect_left(bins.y, self.mdl["detector_maxy"])] - bins.y[bisect_right(bins.y, self.mdl["detector_miny"]) - 1]
-        return (
-            int(ylen / (self.mdl["mask_deltay"] / self.upscale_f.y)),
-            int(xlen / (self.mdl["mask_deltax"] / self.upscale_f.x)),
-        )
+        xmin = np.floor(self.mdl["detector_minx"] / (self.mdl["mask_deltax"] / self.upscale_f.x))
+        xmax = np.ceil(self.mdl["detector_maxx"] / (self.mdl["mask_deltax"] / self.upscale_f.x))
+        ymin = np.floor(self.mdl["detector_miny"] / (self.mdl["mask_deltay"] / self.upscale_f.y))
+        ymax = np.ceil(self.mdl["detector_maxy"] / (self.mdl["mask_deltay"] / self.upscale_f.y))
+        return int(ymax - ymin), int(xmax - xmin)
 
     @property
     def mask_shape(self) -> tuple[int, int]:
@@ -248,6 +254,39 @@ class CodedMaskCamera:
         return n + o - 1, m + p - 1
 
 
+def get_coded_mask_camera(
+    mask_filepath: str | Path,
+    upscale_f: tuple[int, int] = (1, 1),
+) -> CodedMaskCamera:
+    """
+    An interface to CodedMaskCamera.
+
+    Args:
+        mask_filepath: a str or a path object pointing to the mask filepath
+        upscale_f: the upscaling factor in x and y coordinates
+
+    Returns: a CodedMaskCamera object.
+
+    """
+    # guarantee that the bisect operation just below are performed on well suited arrays.
+    mdl = MaskDataLoader(mask_filepath)
+
+    if not (
+        # fmt: off
+        mdl["detector_minx"] >= mdl["mask_minx"] and
+        mdl["detector_maxx"] <= mdl["mask_maxx"] and
+        mdl["detector_miny"] >= mdl["mask_miny"] and
+        mdl["detector_maxy"] <= mdl["mask_maxy"]
+        # fmt: on
+    ):
+        raise ValueError("Detector plane is larger than mask.")
+
+    if not (upscale_f[0] > 0 and upscale_f[1] > 0):
+        raise ValueError("Upscale factors must be positive integers.")
+
+    return CodedMaskCamera(mdl, UpscaleFactor(*upscale_f))
+
+
 def encode(camera: CodedMaskCamera, sky: np.ndarray) -> np.array:
     """Generate detector shadowgram from sky image through coded mask.
 
@@ -263,7 +302,7 @@ def encode(camera: CodedMaskCamera, sky: np.ndarray) -> np.array:
 
 
 def decode(camera: CodedMaskCamera, detector: np.array) -> tuple[np.array, np.array]:
-    """Reconstruct sky image from detector counts using cross-correlation.
+    """Reconstruct balanced sky image from detector counts using cross-correlation.
 
     Args:
         camera: CodedMaskCamera object containing mask and decoder patterns
@@ -294,127 +333,16 @@ def psf(camera: CodedMaskCamera) -> np.array:
     return correlate(camera.mask, camera.decoder, mode="same")
 
 
-def compose(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, Callable[[int, int], tuple[Optional[tuple[int, int]], Optional[tuple[int, int]]]]]:
-    """
-    Composes two matrices `a` and `b` into one square embedding.
-    The `b` matrix is rotated by 90 degree *clockwise*,
-    i.e. np.rot90(b, k=-1) is applied before embedding.
-
-         │
-      ───┼──────────────j-index────────────────▶
-         │     Δ                       Δ
-         │   ◀────▶                  ◀────▶
-         │   ┌────┬──────────────────┬────┐  ▲
-         │   │    │ N                │    │  │
-         │   ├────┼──────────────────┼────┤  │
-         │   │    │                  │  E │  │
-         │   │    │                  │    │  │
-         │   │    │                  │    │  │
-     i-index │    │                  │    │maxd
-         │   │    │                  │    │  │
-         │   │  W │                C │    │  │
-         │   ├────┼──────────────────┼────┤  │
-         │   │    │                S │    │  │
-         │   └────┴──────────────────┴────┘  ▼
-         │        ◀───────mind───────▶
-         ▼
-                        WCE == `a`
-                   NCS ==  rotated(`b`)
+def count(camera, data):
+    """Create 2D histogram of detector counts from event data.
 
     Args:
-        a (ndarray): First input matrix of shape (n,m) where n < m
-        b (ndarray): Second input matrix of same shape as `a`
+        camera: CodedMaskCamera object containing detector binning
+        data: Array of event data with `X` and `Y` coordinates
 
     Returns:
-        Tuple containing:
-            - ndarray: The composed square matrix of size maxd x maxd where
-                      maxd = max(n,m)
-            - Callable: A function f(i,j) that maps positions in the composed matrix
-                       to positions in the original matrices a and b. For each position
-                       it returns a tuple (pos_a, pos_b) where:
-                       - pos_a: Optional tuple (i,j) in matrix a or None if position
-                               doesn't map to a
-                       - pos_b: Optional tuple (i,j) in matrix b or None if position
-                               doesn't map to b
-
-    Raises:
-        AssertionError: If matrices a and b have different shapes
-
-    Example:
-        >>> a = np.array([[1, 2, 3, 4], [5, 6, 7, 8]])  # 2x4 matrix
-        >>> b = np.array([[9, 10, 11, 12], [13, 14, 15, 16]])  # 2x4 matrix
-
-        >>> composed, f = compose(a, b)
-        >>> composed.shape
-        (4, 4)
-        >>> f(1, 1)  # center position
-        ((0, 1), (1, 1))  # maps to both a and rotated b
+        2D array of binned detector counts
     """
-    assert a.shape == b.shape
-    maxd, mind = max(a.shape), min(a.shape)
-    delta = (maxd - mind) // 2
-    a_embedding = np.pad(a, pad_width=((delta, delta), (0, 0)))
-    b_embedding = np.pad(np.rot90(b, k=-1), pad_width=((0, 0), (delta, delta)))
-    composed = a_embedding + b_embedding
-
-    def _rotb2b(i, j):
-        return  mind - 1 - j, i
-
-    def f(i: int, j: int) -> tuple[Optional[tuple[int, int]], Optional[tuple[int, int]]]:
-        """
-        Given a couple of indeces of the recombined image, returns two couples of
-        indeces, one for the `a` matrix, and one for the `b` matrix.
-
-        Args:
-            i (int): row index in the composed matrix
-            j (int): column index in the composed matrix
-
-        Returns:
-            Tuple[Optional[Tuple[int, int]], Optional[Tuple[int, int]]]: A tuple containing
-                - First element: Indices (i,j) in matrix a, or None if position doesn't map to a
-                - Second element: Indices (i,j) in matrix b, or None if position doesn't map to b
-
-        Raises:
-            ValueError: If the position (i,j) is out of bounds of the composed matrix
-        """
-        if not ((0 <= i < maxd) and (0 <= j < maxd)):
-            raise ValueError("position is out of bounds")
-        if j < delta:
-            # W quadrant
-            if not (delta <= i < delta + mind):
-                return None, None
-            else:
-                return (i - delta, j), None
-        elif j < mind + delta:
-            if i < delta:
-                # N quadrant
-                return None, _rotb2b(i, j - delta)
-            elif i < maxd - delta:
-                # C quadrant
-                return (i - delta, j), _rotb2b(i, j - delta)
-            else:
-                # S quadrant
-                return None, _rotb2b(i, j - delta)
-        else:
-            # E quadrant
-            if not (delta <= i < delta + mind):
-                return None, None
-            else:
-                return (i - delta, j), None
-
-    return composed, f
-
-
-def maximize(composed: np.ndarray, f: Callable) -> tuple[Optional[tuple[int, int]], Optional[tuple[int, int]]]:
-    """
-    Maximize the composed image and returns corresponding locations on the component images.
-
-    Args:
-        composed:
-        f:
-
-    Returns:
-
-    """
-    composed_max = np.unravel_index(np.argmax(composed), composed.shape)
-    return f(*composed_max)
+    bins = camera.bins_detector
+    counts, *_ = np.histogram2d(data["Y"], data["X"], bins=[bins.y, bins.x])
+    return counts

@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from iros.mask import compose
+from iros.images import compose
 
 
 class TestCompose(unittest.TestCase):
