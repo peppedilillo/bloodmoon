@@ -135,8 +135,6 @@ i swear
 　 　 │　　|　|　|
 　／￣|　　 |　|　|
 　| (￣ヽ＿_ヽ_)__) """
-
-
 @dataclass(frozen=True)
 class CodedMaskCamera:
     """Class representing a coded mask camera system.
