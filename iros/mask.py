@@ -127,7 +127,7 @@ def _bisect_interval(a: np.array, start: float, stop: float):
 last one 
 i swear
 
-　　　 　　／＞　　フ
+　　　 　　／＞　　 フ
 　　　 　　| 　_　 _ l
 　 　　 　／` ミ＿xノ
 　　 　 /　　　 　 |
@@ -137,7 +137,7 @@ i swear
 　| (￣ヽ＿_ヽ_)__) """
 @dataclass(frozen=True)
 class CodedMaskCamera:
-    """Class representing a coded mask camera system.
+    """Dataclass containing a coded mask camera system.
 
     Handles mask pattern, detector geometry, and related calculations for coded mask imaging.
 
