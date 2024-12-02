@@ -89,11 +89,10 @@ def benchmark_shadowgram(camera: CodedMaskCamera, source_position: tuple[int, in
     return np.round(encode(camera, sky_model)).astype(int)
 
 
-@unittest.skip("This requires some time for computing the benchmarks and is skipped.")
 class TestShadowgram(unittest.TestCase):
     def setUp(self):
         """Set up test data including precomputed benchmark shadowgrams."""
-        self.camera = fetch_camera(path_wfm_mask, (5, 8))
+        self.camera = fetch_camera(path_wfm_mask, (2, 1))
         n, m = self.camera.sky_shape
         self.test_positions = [
             (0, 0),  # Top-left corner

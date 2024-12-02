@@ -1,7 +1,7 @@
 from bisect import bisect_left
 from bisect import bisect_right
 from dataclasses import dataclass
-from functools import cached_property
+from functools import cached_property, cache
 from pathlib import Path
 from typing import NamedTuple
 
@@ -128,7 +128,7 @@ last one
 i swear
 
 　　　 　　／＞　　 フ
-　　　 　　| 　_　 _ l
+　　　 　　| 　_　 _`
 　 　　 　／` ミ＿xノ
 　　 　 /　　　 　 |
 　　　 /　 ヽ　　 ﾉ
@@ -388,11 +388,23 @@ def _shift(a: np.array, shift_ext: tuple[int, int]) -> np.array:
     return hpadded
 
 
+@cache
+def _detector_footprint(camera: CodedMaskCamera) -> tuple[int, int, int, int]:
+    """Cached helper."""
+    bins_detector = camera.bins_detector
+    bins_mask = camera.bins_mask
+    i_min, i_max = _bisect_interval(bins_mask.y, bins_detector.y[0], bins_detector.y[-1])
+    j_min, j_max = _bisect_interval(bins_mask.x, bins_detector.x[0], bins_detector.x[-1])
+    return i_min, i_max, j_min, j_max
+
+
 def shadowgram(camera: CodedMaskCamera, source_position: tuple[int, int]) -> np.array:
     """Fast computation of detector shadowgram for a point source.
 
     Shifts and crops the mask pattern to generate the detector response.
     The output is unnormalized and binary (ones and zeros).
+
+    Does NOT apply bulk correction, nor nomalize.
 
     Args:
         camera: CodedMaskCamera instance containing mask pattern and geometry.
@@ -406,8 +418,5 @@ def shadowgram(camera: CodedMaskCamera, source_position: tuple[int, int]) -> np.
     n, m = camera.sky_shape
     shift_i, shift_j = (n // 2 - i), (m // 2 - j)
     shifted_mask = _shift(camera.mask, (shift_i, shift_j))
-    bins_detector = camera.bins_detector
-    bins_mask = camera.bins_mask
-    i_min, i_max = _bisect_interval(bins_mask.y, bins_detector.y[0], bins_detector.y[-1])
-    j_min, j_max = _bisect_interval(bins_mask.x, bins_detector.x[0], bins_detector.x[-1])
+    i_min, i_max, j_min, j_max = _detector_footprint(camera)
     return shifted_mask[i_min:i_max, j_min:j_max]
