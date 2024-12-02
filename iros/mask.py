@@ -352,3 +352,62 @@ def count(camera, data):
     bins = camera.bins_detector
     counts, *_ = np.histogram2d(data["Y"], data["X"], bins=[bins.y, bins.x])
     return counts
+
+
+def _shift(a: np.array, shift_ext: tuple[int, int]) -> np.array:
+    """Shifts a 2D numpy array by the specified amount in each dimension.
+    This exists because the scipy.ndimage one is slow.
+
+    Args:
+        a: Input 2D numpy array to be shifted.
+        shift_ext: Tuple of (row_shift, column_shift) where positive values shift down/right
+            and negative values shift up/left. Values larger than array dimensions
+            result in an array of zeros.
+
+    Returns:
+        np.array: A new array of the same shape as the input, with elements shifted
+            and empty spaces filled with zeros.
+
+    Examples:
+        >>> arr = np.array([[1, 2], [3, 4]])
+        >>> _shift(arr, (1, 0))  # Shift down by 1
+        array([[0, 0],
+               [1, 2]])
+        >>> _shift(arr, (0, -1))  # Shift left by 1
+        array([[2, 0],
+               [4, 0]])
+    """
+    n, m = a.shape
+    shift_i, shift_j = shift_ext
+    if abs(shift_i) >= n or abs(shift_j) >= m:
+        return np.zeros_like(a)
+    vpadded = np.pad(a, ((0 if shift_i < 0 else shift_i, 0 if shift_i >= 0 else -shift_i), (0, 0)))
+    vpadded = vpadded[:n, :] if shift_i > 0 else vpadded[-n:, :]
+    hpadded = np.pad(vpadded, ((0, 0), (0 if shift_j < 0 else shift_j, 0 if shift_j >= 0 else -shift_j)))
+    hpadded = hpadded[:, :m] if shift_j > 0 else hpadded[:, -m:]
+    return hpadded
+
+
+def shadowgram(camera: CodedMaskCamera, source_position: tuple[int, int]) -> np.array:
+    """Fast computation of detector shadowgram for a point source.
+
+    Shifts and crops the mask pattern to generate the detector response.
+    The output is unnormalized and binary (ones and zeros).
+
+    Args:
+        camera: CodedMaskCamera instance containing mask pattern and geometry.
+        source_position: Tuple of (i,j) integers specifying source position in sky coordinates,
+            where (sky_shape[0]//2, sky_shape[1]//2) is the center.
+
+    Returns:
+        np.array: Binary detector shadowgram of shape (detector_height, detector_width).
+    """
+    i, j = source_position
+    n, m = camera.sky_shape
+    shift_i, shift_j = (n // 2 - i), (m // 2 - j)
+    shifted_mask = _shift(camera.mask, (shift_i, shift_j))
+    bins_detector = camera.bins_detector
+    bins_mask = camera.bins_mask
+    i_min, i_max = _bisect_interval(bins_mask.y, bins_detector.y[0], bins_detector.y[-1])
+    j_min, j_max = _bisect_interval(bins_mask.x, bins_detector.x[0], bins_detector.x[-1])
+    return shifted_mask[i_min:i_max, j_min:j_max]
