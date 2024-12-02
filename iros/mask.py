@@ -305,7 +305,25 @@ def encode(camera: CodedMaskCamera, sky: np.ndarray) -> np.array:
     return unnormalized_shadowgram
 
 
-def decode(camera: CodedMaskCamera, detector: np.array) -> tuple[np.array, np.array]:
+def variance(camera: CodedMaskCamera, detector: np.array) -> np.array:
+    """Reconstruct balanced sky variance from detector counts using cross-correlation.
+
+    Args:
+        camera: CodedMaskCamera object containing mask and decoder patterns
+        detector: 2D array of detector counts
+
+    Returns:
+        Variance map of the reconstructed sky image
+    """
+    var = correlate(np.square(camera.decoder), detector, mode="full")
+    sum_det, sum_bulk = map(np.sum, (detector, camera.bulk))
+    var_bal = (
+        var + np.square(camera.balancing) * sum_det / np.square(sum_bulk) ** 2 - 2 * cc * camera.balancing / sum_bulk
+    )
+    return var_bal
+
+
+def decode(camera: CodedMaskCamera, detector: np.array) -> np.array:
     """Reconstruct balanced sky image from detector counts using cross-correlation.
 
     Args:
@@ -313,18 +331,13 @@ def decode(camera: CodedMaskCamera, detector: np.array) -> tuple[np.array, np.ar
         detector: 2D array of detector counts
 
     Returns:
-        Tuple containing:
-            - Balanced cross-correlation sky image
+        Balanced cross-correlation sky image
             - Variance map of the reconstructed sky image
     """
     cc = correlate(camera.decoder, detector, mode="full")
-    var = correlate(np.square(camera.decoder), detector, mode="full")
     sum_det, sum_bulk = map(np.sum, (detector, camera.bulk))
     cc_bal = cc - camera.balancing * sum_det / sum_bulk
-    var_bal = (
-        var + np.square(camera.balancing) * sum_det / np.square(sum_bulk) ** 2 - 2 * cc * camera.balancing / sum_bulk
-    )
-    return cc_bal, var_bal
+    return cc_bal
 
 
 def psf(camera: CodedMaskCamera) -> np.array:

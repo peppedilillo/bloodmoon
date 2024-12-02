@@ -64,8 +64,12 @@ def compose(
     assert a.shape == b.shape
     maxd, mind = max(a.shape), min(a.shape)
     delta = (maxd - mind) // 2
-    a_embedding = np.pad(a, pad_width=((delta, delta), (0, 0)))
-    b_embedding = np.pad(np.rot90(b, k=-1), pad_width=((0, 0), (delta, delta)))
+    if maxd == a.shape[1]:
+        a_embedding = np.pad(a, pad_width=((delta, delta), (0, 0)))
+        b_embedding = np.pad(np.rot90(b, k=-1), pad_width=((0, 0), (delta, delta)))
+    else:
+        a_embedding = np.pad(a, pad_width=((0, 0), (delta, delta)))
+        b_embedding = np.pad(np.rot90(b, k=-1), pad_width=((delta, delta), (0, 0)))
     composed = a_embedding + b_embedding
 
     def _rotb2b(i, j):
