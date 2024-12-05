@@ -8,7 +8,7 @@ version = "0.0.1"
 authors = [
     { name="Giuseppe Dilillo", email="peppedilillo@gmail.com" },
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
