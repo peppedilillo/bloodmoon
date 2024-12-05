@@ -63,10 +63,7 @@ class SimulationDataLoader:
                 raise ValueError(f"A file matching the pattern {str(parent / pattern)} is expected but missing.")
             f, *extra_matches = matches
             if extra_matches:
-                raise ValueError(
-                    f"Found unexpected extra matches for glob pattern {str(parent / pattern)}."
-                    f"File with pattern {pattern} should be unique"
-                )
+                raise ValueError(f"Found unexpected extra matches for glob pattern {str(parent / pattern)}." f"File with pattern {pattern} should be unique")
             return f
 
         return {

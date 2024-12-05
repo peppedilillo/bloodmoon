@@ -1,18 +1,20 @@
-from typing import Callable, Optional
-from functools import partial, cache
 from bisect import bisect
+from functools import cache
+from functools import partial
+from typing import Callable, Optional
 
 import numpy as np
-from scipy.signal import convolve
 from scipy.integrate import trapezoid
 from scipy.interpolate import RegularGridInterpolator
+from scipy.signal import convolve
 
-from iros.mask import CodedMaskCamera, _bisect_interval, Bins2D, UpscaleFactor
+from iros.mask import _bisect_interval
+from iros.mask import Bins2D
+from iros.mask import CodedMaskCamera
+from iros.mask import UpscaleFactor
 
 
-def compose(
-    a: np.ndarray, b: np.ndarray
-) -> tuple[np.ndarray, Callable[[int, int], tuple[Optional[tuple[int, int]], Optional[tuple[int, int]]]]]:
+def compose(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, Callable[[int, int], tuple[Optional[tuple[int, int]], Optional[tuple[int, int]]]]]:
     """
     Composes two matrices `a` and `b` into one square embedding.
     The `b` matrix is rotated by 90 degree *clockwise*,
@@ -228,7 +230,10 @@ def chop(camera: CodedMaskCamera, pos: tuple[int, int], sky: np.array) -> tuple[
     packing_x, packing_y = map(lambda x: x * 2, _packing_factor(camera))
     min_i, max_i = _bisect_interval(bins.y, bins.y[i] - camera.mdl["slit_deltay"] / packing_y, bins.y[i] + camera.mdl["slit_deltay"] / packing_y)
     min_j, max_j = _bisect_interval(bins.x, bins.x[j] - camera.mdl["slit_deltax"] / packing_x, bins.x[j] + camera.mdl["slit_deltax"] / packing_x)
-    return sky[min_i:max_i, min_j:max_j], Bins2D(x=bins.x[min_j: max_j + 1], y=bins.y[min_i: max_i + 1], )
+    return sky[min_i:max_i, min_j:max_j], Bins2D(
+        x=bins.x[min_j : max_j + 1],
+        y=bins.y[min_i : max_i + 1],
+    )
 
 
 def _interp(tile: np.array, bins: Bins2D, interp_f):
@@ -246,15 +251,15 @@ def _interp(tile: np.array, bins: Bins2D, interp_f):
     """
     midpoints_x = (bins.x[1:] + bins.x[:-1]) / 2
     midpoints_y = (bins.y[1:] + bins.y[:-1]) / 2
-    midpoints_x_fine = np.linspace(midpoints_x[0], midpoints_x[-1], len(midpoints_x) * interp_f.x + 1 )
-    midpoints_y_fine = np.linspace(midpoints_y[0], midpoints_y[-1], len(midpoints_y) * interp_f.y + 1 )
+    midpoints_x_fine = np.linspace(midpoints_x[0], midpoints_x[-1], len(midpoints_x) * interp_f.x + 1)
+    midpoints_y_fine = np.linspace(midpoints_y[0], midpoints_y[-1], len(midpoints_y) * interp_f.y + 1)
     interp = RegularGridInterpolator((midpoints_x, midpoints_y), tile.T, method="cubic")
     grid_x_fine, grid_y_fine = np.meshgrid(midpoints_x_fine, midpoints_y_fine)
     tile_interp = interp((grid_x_fine, grid_y_fine))
     return tile_interp, Bins2D(x=midpoints_x_fine, y=midpoints_y_fine)
 
 
-def interpmax(camera: CodedMaskCamera, pos, sky, interp_f: UpscaleFactor=UpscaleFactor(10, 10)):
+def interpmax(camera: CodedMaskCamera, pos, sky, interp_f: UpscaleFactor = UpscaleFactor(10, 10)):
     """
     Interpolates and maximizes data around pos.
 
@@ -289,12 +294,12 @@ def modsech(x, norm, center, alpha, beta):
     return norm / np.cosh(np.abs((x - center) / alpha) * beta)
 
 
-psfx = partial(modsech, norm=1., **params_psfx)
-psfy = partial(modsech, norm=1., **params_psfy)
+psfx = partial(modsech, norm=1.0, **params_psfx)
+psfy = partial(modsech, norm=1.0, **params_psfy)
 
 
 def norm_constant(center, alpha, beta):
-    xs = np.linspace(-50*alpha, +50*alpha, 10000)
+    xs = np.linspace(-50 * alpha, +50 * alpha, 10000)
     return 1 / trapezoid(
         y=modsech(xs, norm=1, center=center, alpha=alpha, beta=beta),
         x=xs,
@@ -313,7 +318,7 @@ norm_psfy = norm_modsech(**params_psfy)
 def filter_detector(camera: CodedMaskCamera, detector: np.array):
     bins = camera.bins_detector
     min_bin, max_bin = _bisect_interval(np.round(bins.y, 2), -5, +5)
-    bin_edges = bins.y[min_bin: max_bin + 1]
+    bin_edges = bins.y[min_bin : max_bin + 1]
     midpoints = (bin_edges[1:] + bin_edges[:-1]) / 2
     kernel = norm_psfy(midpoints).reshape(len(midpoints), -1)
     kernel = kernel / np.sum(kernel)

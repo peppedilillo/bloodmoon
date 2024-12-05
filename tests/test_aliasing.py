@@ -1,6 +1,7 @@
-import unittest
-import numpy as np
 from typing import Dict, Tuple
+import unittest
+
+import numpy as np
 
 from iros.images import rbilinear
 
@@ -15,210 +16,238 @@ class TestAntibilinear(unittest.TestCase):
     def test_center_point(self):
         bins_x = np.linspace(0, 5, 6)
         bins_y = np.linspace(0, 7, 8)
-        expected = np.array([
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 1., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.]
-        ])
+        expected = np.array(
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+            ]
+        )
         weights = rbilinear(2.5, 3.5, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_off_center_point_top(self):
         bins_x = np.linspace(0, 5, 6)
         bins_y = np.linspace(0, 7, 8)
-        expected = np.array([
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., .5, 0., 0.],
-            [0., 0., .5, 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.]
-        ])
-        weights = rbilinear(2.5, 3., bins_x, bins_y)
+        expected = np.array(
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.5, 0.0, 0.0],
+                [0.0, 0.0, 0.5, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+            ]
+        )
+        weights = rbilinear(2.5, 3.0, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_off_center_point_bottom(self):
         bins_x = np.linspace(0, 5, 6)
         bins_y = np.linspace(0, 7, 8)
-        expected = np.array([
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., .5, 0., 0.],
-            [0., 0., .5, 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.]
-        ])
-        weights = rbilinear(2.5, 4., bins_x, bins_y)
+        expected = np.array(
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.5, 0.0, 0.0],
+                [0.0, 0.0, 0.5, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+            ]
+        )
+        weights = rbilinear(2.5, 4.0, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_off_center_point_right(self):
         bins_x = np.linspace(0, 5, 6)
         bins_y = np.linspace(0, 7, 8)
-        expected = np.array([
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0.5, 0.5, 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.]
-        ])
+        expected = np.array(
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.5, 0.5, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+            ]
+        )
         weights = rbilinear(3.0, 3.5, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_off_center_point_left(self):
         bins_x = np.linspace(0, 5, 6)
         bins_y = np.linspace(0, 7, 8)
-        expected = np.array([
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0.5, 0.5, 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.]
-        ])
+        expected = np.array(
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.5, 0.5, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+            ]
+        )
         weights = rbilinear(2.0, 3.5, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_grid_corner(self):
         bins_x = np.linspace(0, 5, 6)
         bins_y = np.linspace(0, 7, 8)
-        expected = np.array([
-            [0., 0., 0., 0., 0.],
-            [0., 0.25, 0.25, 0., 0.],
-            [0., 0.25, 0.25, 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.]
-        ])
+        expected = np.array(
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.25, 0.25, 0.0, 0.0],
+                [0.0, 0.25, 0.25, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+            ]
+        )
         weights = rbilinear(2.0, 2.0, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_corner_topleft(self):
         bins_x = np.linspace(0, 5, 6)
         bins_y = np.linspace(0, 7, 8)
-        expected = np.array([
-            [1., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.]
-        ])
-        weights = rbilinear(.1, .1, bins_x, bins_y)
+        expected = np.array(
+            [
+                [1.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+            ]
+        )
+        weights = rbilinear(0.1, 0.1, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_corner_topright(self):
         bins_x = np.linspace(0, 5, 6)
         bins_y = np.linspace(0, 7, 8)
-        expected = np.array([
-            [0., 0., 0., 0., 1.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.]
-        ])
+        expected = np.array(
+            [
+                [0.0, 0.0, 0.0, 0.0, 1.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+            ]
+        )
         weights = rbilinear(4.99, 0.01, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_corner_botright(self):
         bins_x = np.linspace(0, 5, 6)
         bins_y = np.linspace(0, 7, 8)
-        expected = np.array([
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 1.]
-        ])
+        expected = np.array(
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 1.0],
+            ]
+        )
         weights = rbilinear(4.99, 6.99, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_corner_botleft(self):
         bins_x = np.linspace(0, 5, 6)
         bins_y = np.linspace(0, 7, 8)
-        expected = np.array([
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [1., 0., 0., 0., 0.]
-        ])
+        expected = np.array(
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0, 0.0, 0.0],
+            ]
+        )
         weights = rbilinear(0.01, 6.99, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_bottom_side(self):
         bins_x = np.linspace(0, 5, 6)
         bins_y = np.linspace(0, 7, 8)
-        expected = np.array([
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 1., 0., 0., 0.]
-        ])
+        expected = np.array(
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0, 0.0],
+            ]
+        )
         weights = rbilinear(1.5, 6.99, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_right_side(self):
         bins_x = np.linspace(0, 5, 6)
         bins_y = np.linspace(0, 7, 8)
-        expected = np.array([
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 1.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.]
-        ])
+        expected = np.array(
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 1.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+            ]
+        )
         weights = rbilinear(4.99, 3.5, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_top_side(self):
         bins_x = np.linspace(0, 5, 6)
         bins_y = np.linspace(0, 7, 8)
-        expected = np.array([
-            [0., 0., 1., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.]
-        ])
+        expected = np.array(
+            [
+                [0.0, 0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+            ]
+        )
         weights = rbilinear(2.5, 0.01, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_left_side(self):
         bins_x = np.linspace(0, 5, 6)
         bins_y = np.linspace(0, 7, 8)
-        expected = np.array([
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [1., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.],
-            [0., 0., 0., 0., 0.]
-        ])
+        expected = np.array(
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+            ]
+        )
         weights = rbilinear(0.01, 3.5, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
@@ -238,5 +267,5 @@ class TestAntibilinear(unittest.TestCase):
             rbilinear(1, 2.1, bins_x, bins_y)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

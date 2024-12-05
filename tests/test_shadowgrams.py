@@ -1,16 +1,20 @@
 import unittest
+
 import numpy as np
-from iros.mask import encode, CodedMaskCamera, fetch_camera, _shift, shadowgram
+
 from iros.assets import path_wfm_mask
+from iros.mask import _shift
+from iros.mask import CodedMaskCamera
+from iros.mask import encode
+from iros.mask import fetch_camera
+from iros.mask import shadowgram
 
 
 class TestArrayShift(unittest.TestCase):
     def setUp(self):
         # Common test arrays
         self.arr_2x2 = np.array([[1, 2], [3, 4]])
-        self.arr_3x3 = np.array([[1, 2, 3],
-                                 [4, 5, 6],
-                                 [7, 8, 9]])
+        self.arr_3x3 = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
         self.arr_2x3 = np.array([[1, 2, 3], [4, 5, 6]])
 
     def test_basic_shifts(self):
@@ -31,14 +35,10 @@ class TestArrayShift(unittest.TestCase):
 
     def test_both_dimensions(self):
         """Test shifting in both dimensions simultaneously"""
-        expected = np.array([[0, 0, 0],
-                             [0, 1, 2],
-                             [0, 4, 5]])
+        expected = np.array([[0, 0, 0], [0, 1, 2], [0, 4, 5]])
         np.testing.assert_array_equal(_shift(self.arr_3x3, (1, 1)), expected)
 
-        expected = np.array([[5, 6, 0],
-                             [8, 9, 0],
-                             [0, 0, 0]])
+        expected = np.array([[5, 6, 0], [8, 9, 0], [0, 0, 0]])
         np.testing.assert_array_equal(_shift(self.arr_3x3, (-1, -1)), expected)
 
     def test_large_shifts(self):
@@ -107,10 +107,7 @@ class TestShadowgram(unittest.TestCase):
         ]
 
         # Precompute benchmark shadowgrams
-        self.benchmark_shadows = {
-            pos: benchmark_shadowgram(self.camera, pos)
-            for pos in self.test_positions
-        }
+        self.benchmark_shadows = {pos: benchmark_shadowgram(self.camera, pos) for pos in self.test_positions}
 
     def test_shapes_match(self):
         """Test if both implementations produce the same shape outputs."""
@@ -121,7 +118,7 @@ class TestShadowgram(unittest.TestCase):
                 self.assertEqual(
                     shadow.shape,
                     benchmark.shape,
-                    f"Shape mismatch at position {pos}: {shadow.shape} vs {benchmark.shape}"
+                    f"Shape mismatch at position {pos}: {shadow.shape} vs {benchmark.shape}",
                 )
 
     def test_arrays_equal(self):
@@ -130,11 +127,7 @@ class TestShadowgram(unittest.TestCase):
             with self.subTest(position=pos):
                 shadow = shadowgram(self.camera, pos)
                 benchmark = self.benchmark_shadows[pos]
-                np.testing.assert_array_equal(
-                    shadow,
-                    benchmark,
-                    err_msg=f"Arrays not equal at position {pos}"
-                )
+                np.testing.assert_array_equal(shadow, benchmark, err_msg=f"Arrays not equal at position {pos}")
 
     def test_array_sums_match(self):
         """Test if the total counts in the shadowgrams match."""
@@ -142,9 +135,4 @@ class TestShadowgram(unittest.TestCase):
             with self.subTest(position=pos):
                 shadow = shadowgram(self.camera, pos)
                 benchmark = self.benchmark_shadows[pos]
-                np.testing.assert_almost_equal(
-                    np.sum(shadow),
-                    np.sum(benchmark),
-                    decimal=8,
-                    err_msg=f"Total counts mismatch at position {pos}"
-                )
+                np.testing.assert_almost_equal(np.sum(shadow), np.sum(benchmark), decimal=8, err_msg=f"Total counts mismatch at position {pos}")

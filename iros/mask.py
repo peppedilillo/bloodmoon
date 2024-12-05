@@ -1,7 +1,8 @@
 from bisect import bisect_left
 from bisect import bisect_right
 from dataclasses import dataclass
-from functools import cached_property, cache
+from functools import cache
+from functools import cached_property
 from pathlib import Path
 from typing import NamedTuple
 
@@ -135,6 +136,8 @@ i swear
 　 　 │　　|　|　|
 　／￣|　　 |　|　|
 　| (￣ヽ＿_ヽ_)__) """
+
+
 @dataclass(frozen=True)
 class CodedMaskCamera:
     """Dataclass containing a coded mask camera system.
@@ -185,7 +188,10 @@ class CodedMaskCamera:
     def _bins_sky(self, upscale_f: UpscaleFactor) -> Bins2D:
         """Binning structure for the reconstructed sky image."""
         binsd, binsm = self.bins_detector, self.bins_mask
-        xstep, ystep = binsm.x[1] - binsm.x[0], binsm.y[1] - binsm.y[0],
+        xstep, ystep = (
+            binsm.x[1] - binsm.x[0],
+            binsm.y[1] - binsm.y[0],
+        )
         return Bins2D(
             np.linspace(binsd.x[0] + binsm.x[0] + xstep, binsd.x[-1] + binsm.x[-1] - xstep, self.sky_shape[1]),
             np.linspace(binsd.y[0] + binsm.y[0] + ystep, binsd.y[-1] + binsm.y[-1] - ystep, self.sky_shape[0]),
@@ -305,9 +311,7 @@ def variance(camera: CodedMaskCamera, detector: np.array) -> np.array:
     cc = correlate(camera.decoder, detector, mode="full")
     var = correlate(np.square(camera.decoder), detector, mode="full")
     sum_det, sum_bulk = map(np.sum, (detector, camera.bulk))
-    var_bal = (
-        var + np.square(camera.balancing) * sum_det / np.square(sum_bulk) ** 2 - 2 * cc * camera.balancing / sum_bulk
-    )
+    var_bal = var + np.square(camera.balancing) * sum_det / np.square(sum_bulk) ** 2 - 2 * cc * camera.balancing / sum_bulk
     return var_bal
 
 
