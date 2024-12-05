@@ -1,6 +1,12 @@
 from typing import Callable, Optional
+from functools import partial
+from bisect import bisect
 
 import numpy as np
+from scipy.signal import convolve
+from scipy.integrate import trapezoid
+
+from iros.mask import CodedMaskCamera, _bisect_interval
 
 
 def compose(
@@ -129,4 +135,107 @@ def argmax(composed: np.ndarray) -> tuple[int, int]:
     Returns:
         Tuple of (row, col) indices of maximum value
     """
-    return tuple(np.unravel_index(np.argmax(composed), composed.shape))
+    return tuple(map(int, np.unravel_index(np.argmax(composed), composed.shape)))
+
+
+def rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array) -> dict[tuple, float]:
+    """
+    Reverse bilinear interpolation weights for a point in a 2D grid.
+    Y coordinates are supposed to grow top to bottom.
+    X coordinates grow left to right.
+
+    Args:
+        cx: x-coordinate of the point
+        cy: y-coordinate of the point
+        bins_x: Sorted array of x-axis grid boundaries
+        bins_y: Sorted array of y-axis grid boundaries
+
+    Returns:
+        Dictionary mapping grid point indices to their interpolation weights
+
+    Raises:
+        ValueError: If grid is invalid or point lies outside
+    """
+    if len(bins_x) < 2 or len(bins_y) < 2:
+        raise ValueError("Grid boundaries must have at least 2 points")
+    if not (np.all(np.diff(bins_x) > 0) and np.all(np.diff(bins_y) > 0)):
+        raise ValueError("Grid bins must be strictly increasing")
+    if not (bins_x[0] < cx < bins_x[-1] and bins_y[0] < cy < bins_y[-1]):
+        raise ValueError("Center lies outside grid.")
+
+    i, j = (bisect(bins_y, cy) - 1), bisect(bins_x, cx) - 1
+    if i == 0 or j == 0 or i == len(bins_y) - 2 or j == len(bins_x) - 2:
+        return {(i, j): 1.0}
+
+    mx, my = (bins_x[j] + bins_x[j + 1]) / 2, (bins_y[i] + bins_y[i + 1]) / 2
+    deltax, deltay = cx - mx, cy - my
+    a = (i, j)
+    b = (i, j + 1) if deltax > 0 else (i, j - 1)
+    c = (i + 1, j) if deltay > 0 else (i - 1, j)
+
+    if deltax > 0 and deltay < 0:
+        d = (i - 1, j + 1)
+    elif deltax > 0 and deltay > 0:
+        d = (i + 1, j + 1)
+    elif deltax < 0 and deltay > 0:
+        d = (i + 1, j - 1)
+    else:
+        d = (i - 1, j - 1)
+
+    deltax, deltay = map(abs, (deltax, deltay))
+    weights = {
+        a: (1 - deltay) * (1 - deltax),
+        b: (1 - deltay) * deltax,
+        c: (1 - deltax) * deltay,
+        d: deltay * deltax,
+    }
+    total = sum(weights.values())
+    return {k: v / total for k, v in weights.items()}
+
+
+params_psfx = {
+    "center": 0,
+    "alpha": 0.0016,
+    "beta": 0.6938,
+}
+
+params_psfy = {
+    "center": 0,
+    "alpha": 0.3214,
+    "beta": 0.6246,
+}
+
+
+def modsech(x, norm, center, alpha, beta):
+    return norm / np.cosh(np.abs((x - center) / alpha) * beta)
+
+
+psfx = partial(modsech, norm=1., **params_psfx)
+psfy = partial(modsech, norm=1., **params_psfy)
+
+
+def norm_constant(center, alpha, beta):
+    xs = np.linspace(-50*alpha, +50*alpha, 10000)
+    return 1 / trapezoid(
+        y=modsech(xs, norm=1, center=center, alpha=alpha, beta=beta),
+        x=xs,
+    )
+
+
+def norm_modsech(center, alpha, beta):
+    norm = norm_constant(center, alpha, beta)
+    return partial(modsech, norm=norm, center=center, alpha=alpha, beta=beta)
+
+
+norm_psfx = norm_modsech(**params_psfx)
+norm_psfy = norm_modsech(**params_psfy)
+
+
+def filter_detector(camera: CodedMaskCamera, detector: np.array):
+    bins = camera.bins_detector
+    min_bin, max_bin = _bisect_interval(np.round(bins.y, 2), -5, +5)
+    bin_edges = bins.y[min_bin: max_bin + 1]
+    midpoints = (bin_edges[1:] + bin_edges[:-1]) / 2
+    kernel = norm_psfy(midpoints).reshape(len(midpoints), -1)
+    kernel = kernel / np.sum(kernel)
+    return convolve(detector, kernel, mode="same")

@@ -184,25 +184,12 @@ class CodedMaskCamera:
 
     def _bins_sky(self, upscale_f: UpscaleFactor) -> Bins2D:
         """Binning structure for the reconstructed sky image."""
-        o, p = self.mask_shape
-        bins = self._bins_detector(upscale_f)
-        binstep, nbins = bins.x[1] - bins.x[0], o // 2 - 1
-        xbins = np.concatenate(
-            (
-                np.linspace(bins.x[0] - (nbins + 1) * binstep, bins.x[-0] - binstep, nbins + 1),
-                bins.x,
-                np.linspace(bins.x[-1] + binstep, bins.x[-1] + nbins * binstep, nbins),
-            )
+        binsd, binsm = self.bins_detector, self.bins_mask
+        xstep, ystep = binsm.x[1] - binsm.x[0], binsm.y[1] - binsm.y[0],
+        return Bins2D(
+            np.linspace(binsd.x[0] + binsm.x[0] + xstep, binsd.x[-1] + binsm.x[-1] - xstep, self.sky_shape[1]),
+            np.linspace(binsd.y[0] + binsm.y[0] + ystep, binsd.y[-1] + binsm.y[-1] - ystep, self.sky_shape[0]),
         )
-        binstep, nbins = bins.y[1] - bins.y[0], p // 2 - 1
-        ybins = np.concatenate(
-            (
-                np.linspace(bins.y[0] - (nbins + 1) * binstep, bins.y[-0] - binstep, nbins + 1),
-                bins.y,
-                np.linspace(bins.y[-1] + binstep, bins.y[-1] + nbins * binstep, nbins),
-            )
-        )
-        return Bins2D(x=xbins, y=ybins)
 
     @property
     def bins_sky(self) -> Bins2D:
@@ -315,6 +302,7 @@ def variance(camera: CodedMaskCamera, detector: np.array) -> np.array:
     Returns:
         Variance map of the reconstructed sky image
     """
+    cc = correlate(camera.decoder, detector, mode="full")
     var = correlate(np.square(camera.decoder), detector, mode="full")
     sum_det, sum_bulk = map(np.sum, (detector, camera.bulk))
     var_bal = (
