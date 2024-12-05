@@ -215,6 +215,8 @@ class MaskDataLoader:
                 "mask_maxy": h["MAXY"],
                 "mask_deltax": h["ELXDIM"],
                 "mask_deltay": h["ELYDIM"],
+                "slit_deltax": h["DXSLIT"],
+                "slit_deltay": h["DYSLIT"],
                 "detector_minx": h["PLNXMIN"],
                 "detector_maxx": h["PLNXMAX"],
                 "detector_miny": h["PLNYMIN"],

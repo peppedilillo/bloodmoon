@@ -5,8 +5,9 @@ from bisect import bisect
 import numpy as np
 from scipy.signal import convolve
 from scipy.integrate import trapezoid
+from scipy.interpolate import RegularGridInterpolator
 
-from iros.mask import CodedMaskCamera, _bisect_interval
+from iros.mask import CodedMaskCamera, _bisect_interval, Bins2D, UpscaleFactor
 
 
 def compose(
@@ -191,6 +192,84 @@ def rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array) -> dict[
     }
     total = sum(weights.values())
     return {k: v / total for k, v in weights.items()}
+
+
+@cache
+def _packing_factor(camera: CodedMaskCamera) -> tuple[float, float]:
+    """
+    Returns the density of slits along the x and y axis.
+
+    Args:
+        camera: a CodedMaskCamera object.
+
+    Returns:
+        A tuple of the x and y packing factors.
+    """
+    rows_notnull = camera.mask[np.any(camera.mask != 0, axis=1), :]
+    cols_notnull = camera.mask[:, np.any(camera.mask != 0, axis=0)]
+    pack_x, pack_y = np.mean(np.mean(rows_notnull, axis=1)), np.mean(np.mean(cols_notnull, axis=0))
+    return tuple(map(float, (pack_x, pack_y)))
+
+
+def chop(camera: CodedMaskCamera, pos: tuple[int, int], sky: np.array) -> tuple[np.array, Bins2d]:
+    """
+    Returns a slice of `sky` centered around `pos` and sized slightly larger than slit size.
+
+    Args:
+        camera: a CodedMaskCameraObject.
+        pos: the (row, col) indeces of the slice center.
+        sky: a sky image.
+
+    Returns:
+        A tuple of the slice value and its bins.
+    """
+    bins = camera.bins_sky
+    i, j = pos
+    packing_x, packing_y = map(lambda x: x * 2, _packing_factor(camera))
+    min_i, max_i = _bisect_interval(bins.y, bins.y[i] - camera.mdl["slit_deltay"] / packing_y, bins.y[i] + camera.mdl["slit_deltay"] / packing_y)
+    min_j, max_j = _bisect_interval(bins.x, bins.x[j] - camera.mdl["slit_deltax"] / packing_x, bins.x[j] + camera.mdl["slit_deltax"] / packing_x)
+    return sky[min_i:max_i, min_j:max_j], Bins2D(x=bins.x[min_j: max_j + 1], y=bins.y[min_i: max_i + 1], )
+
+
+def _interp(tile: np.array, bins: Bins2D, interp_f):
+    """
+    Upscales a regular grid of data and interpolates with cubic splines.
+
+    Args:
+        tile: the data value to interpolate
+        bins: a Bins2D object. If data has shape (n, m), `bins` should have shape (n + 1,m + 1).
+        interp_f: a `UpscaleFactor` object representing the upscaling to be applied on the data.
+
+    Returns:
+        a tuple of the interpolated data and their __midpoints__ (not bins!).
+
+    """
+    midpoints_x = (bins.x[1:] + bins.x[:-1]) / 2
+    midpoints_y = (bins.y[1:] + bins.y[:-1]) / 2
+    midpoints_x_fine = np.linspace(midpoints_x[0], midpoints_x[-1], len(midpoints_x) * interp_f.x + 1 )
+    midpoints_y_fine = np.linspace(midpoints_y[0], midpoints_y[-1], len(midpoints_y) * interp_f.y + 1 )
+    interp = RegularGridInterpolator((midpoints_x, midpoints_y), tile.T, method="cubic")
+    grid_x_fine, grid_y_fine = np.meshgrid(midpoints_x_fine, midpoints_y_fine)
+    tile_interp = interp((grid_x_fine, grid_y_fine))
+    return tile_interp, Bins2D(x=midpoints_x_fine, y=midpoints_y_fine)
+
+
+def interpmax(camera: CodedMaskCamera, pos, sky, interp_f: UpscaleFactor=UpscaleFactor(10, 10)):
+    """
+    Interpolates and maximizes data around pos.
+
+    Args:
+        camera: a CodedMaskCamera object.
+        pos: the (row, col) indeces of the slice center.
+        sky: the sky image.
+        interp_f: a `UpscaleFactor` object representing the upscaling to be applied on the data.
+
+    Returns:
+        Sky-shift position of the interpolated maximum.
+    """
+    tile_interp, bins_fine = _interp(*chop(camera, pos, sky), interp_f)
+    max_tile_i, max_tile_j = argmax(tile_interp)
+    return tuple(map(float, (bins_fine.x[max_tile_j], bins_fine.y[max_tile_i])))
 
 
 params_psfx = {
