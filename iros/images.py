@@ -1,5 +1,5 @@
 from typing import Callable, Optional
-from functools import partial
+from functools import partial, cache
 from bisect import bisect
 
 import numpy as np
@@ -211,7 +211,7 @@ def _packing_factor(camera: CodedMaskCamera) -> tuple[float, float]:
     return tuple(map(float, (pack_x, pack_y)))
 
 
-def chop(camera: CodedMaskCamera, pos: tuple[int, int], sky: np.array) -> tuple[np.array, Bins2d]:
+def chop(camera: CodedMaskCamera, pos: tuple[int, int], sky: np.array) -> tuple[np.array, Bins2D]:
     """
     Returns a slice of `sky` centered around `pos` and sized slightly larger than slit size.
 
