@@ -193,8 +193,8 @@ class CodedMaskCamera:
             binsm.y[1] - binsm.y[0],
         )
         return Bins2D(
-            np.linspace(binsd.x[0] + binsm.x[0] + xstep, binsd.x[-1] + binsm.x[-1] - xstep, self.sky_shape[1]),
-            np.linspace(binsd.y[0] + binsm.y[0] + ystep, binsd.y[-1] + binsm.y[-1] - ystep, self.sky_shape[0]),
+            np.linspace(binsd.x[0] + binsm.x[0] + xstep, binsd.x[-1] + binsm.x[-1], self.sky_shape[1] + 1),
+            np.linspace(binsd.y[0] + binsm.y[0] + ystep, binsd.y[-1] + binsm.y[-1], self.sky_shape[0] + 1),
         )
 
     @property

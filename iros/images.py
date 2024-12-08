@@ -185,11 +185,12 @@ def rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array) -> dict[
     else:
         d = (i - 1, j - 1)
 
+    xstep, ystep = bins_x[1] - bins_x[0], bins_y[1] - bins_y[0]
     deltax, deltay = map(abs, (deltax, deltay))
     weights = {
-        a: (1 - deltay) * (1 - deltax),
-        b: (1 - deltay) * deltax,
-        c: (1 - deltax) * deltay,
+        a: (ystep - deltay) * (xstep - deltax),
+        b: (ystep - deltay) * deltax,
+        c: (xstep - deltax) * deltay,
         d: deltay * deltax,
     }
     total = sum(weights.values())
@@ -315,11 +316,11 @@ norm_psfx = norm_modsech(**params_psfx)
 norm_psfy = norm_modsech(**params_psfy)
 
 
-def filter_detector(camera: CodedMaskCamera, detector: np.array):
+def get_kernel(camera):
     bins = camera.bins_detector
-    min_bin, max_bin = _bisect_interval(np.round(bins.y, 2), -5, +5)
-    bin_edges = bins.y[min_bin : max_bin + 1]
+    min_bin, max_bin = _bisect_interval(np.round(bins.y, 2), -5., +5.)
+    bin_edges = bins.y[min_bin: max_bin + 1]
     midpoints = (bin_edges[1:] + bin_edges[:-1]) / 2
     kernel = norm_psfy(midpoints).reshape(len(midpoints), -1)
-    kernel = kernel / np.sum(kernel)
-    return convolve(detector, kernel, mode="same")
+    kernel = kernel / np. sum(kernel)
+    return kernel
