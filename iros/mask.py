@@ -12,7 +12,7 @@ from scipy.stats import binned_statistic_2d
 
 from .io import MaskDataLoader
 from .coords import to_angles
-from .types import Bins2D
+from .types import BinsRectangular
 
 
 def _bin(
@@ -71,7 +71,7 @@ def _upscale(
 
 def _fold(
     ml: FITS_rec,
-    mask_bins: Bins2D,
+    mask_bins: BinsRectangular,
 ) -> np.array:
     """Convert mask data from FITS record to 2D binned array.
 
@@ -145,54 +145,54 @@ class CodedMaskCamera:
     def _bins_mask(
         self,
         upscale_f: UpscaleFactor,
-    ) -> Bins2D:
+    ) -> BinsRectangular:
         """Generate binning structure for mask with given upscale factors."""
-        return Bins2D(
+        return BinsRectangular(
             _bin(self.mdl["mask_minx"], self.mdl["mask_maxx"], self.mdl["mask_deltax"] / upscale_f.x),
             _bin(self.mdl["mask_miny"], self.mdl["mask_maxy"], self.mdl["mask_deltay"] / upscale_f.y),
         )
 
     @cached_property
-    def bins_mask(self) -> Bins2D:
+    def bins_mask(self) -> BinsRectangular:
         """Binning structure for the mask pattern."""
         return self._bins_mask(self.upscale_f)
 
-    def _bins_detector(self, upscale_f: UpscaleFactor) -> Bins2D:
+    def _bins_detector(self, upscale_f: UpscaleFactor) -> BinsRectangular:
         """Generate binning structure for detector with given upscale factors."""
         bins = self._bins_mask(self.upscale_f)
         xmin, xmax = _bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
         ymin, ymax = _bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
-        return Bins2D(
+        return BinsRectangular(
             _bin(bins.x[xmin], bins.x[xmax], self.mdl["mask_deltax"] / upscale_f.x),
             _bin(bins.y[ymin], bins.y[ymax], self.mdl["mask_deltay"] / upscale_f.y),
         )
 
     @cached_property
-    def bins_detector(self) -> Bins2D:
+    def bins_detector(self) -> BinsRectangular:
         """Binning structure for the detector."""
         return self._bins_detector(self.upscale_f)
 
-    def _bins_sky(self, upscale_f: UpscaleFactor) -> Bins2D:
+    def _bins_sky(self, upscale_f: UpscaleFactor) -> BinsRectangular:
         """Binning structure for the reconstructed sky image."""
-        binsd, binsm = self.bins_detector, self.bins_mask
+        binsd, binsm = self._bins_detector(upscale_f), self._bins_mask(upscale_f)
         xstep, ystep = (
             binsm.x[1] - binsm.x[0],
             binsm.y[1] - binsm.y[0],
         )
-        return Bins2D(
+        return BinsRectangular(
             np.linspace(binsd.x[0] + binsm.x[0] + xstep, binsd.x[-1] + binsm.x[-1], self.sky_shape[1] + 1),
             np.linspace(binsd.y[0] + binsm.y[0] + ystep, binsd.y[-1] + binsm.y[-1], self.sky_shape[0] + 1),
         )
 
     @cached_property
-    def bins_sky(self) -> Bins2D:
+    def bins_sky(self) -> BinsRectangular:
         """Returns bins for the sky-shift domain"""
         return self._bins_sky(self.upscale_f)
 
     @cached_property
-    def bins_angle_sky(self) -> Bins2D:
+    def bins_angle_sky(self) -> BinsRectangular:
         """Returns bins for the sky-shift domain"""
-        return Bins2D(*to_angles(self.bins_sky.x, self.bins_sky.y, self.mdl["mask_detector_distance"]))
+        return BinsRectangular(*to_angles(self.bins_sky.x, self.bins_sky.y, self.mdl["mask_detector_distance"]))
 
     @cached_property
     def mask(self) -> np.array:

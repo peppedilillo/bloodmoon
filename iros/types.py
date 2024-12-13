@@ -3,7 +3,7 @@ from typing import NamedTuple
 import numpy as np
 
 
-class Bins2D(NamedTuple):
+class BinsRectangular(NamedTuple):
     """Two-dimensional binning structure for rectangular coordinates.
 
     Args:

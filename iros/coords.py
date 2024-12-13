@@ -1,6 +1,6 @@
 import numpy as np
 
-from .types import Bins2D, BinsEquatorial
+from .types import BinsRectangular, BinsEquatorial
 
 
 def _rotation_matrices(
@@ -145,7 +145,7 @@ def to_angles(
     midpoints_xs: np.array,
     midpoints_ys: np.array,
     distance_detector_mask: float,
-) -> Bins2D:
+) -> BinsRectangular:
     """
     Expresses the sky-shift coordinates in terms of angle between source and the detector center.
 
@@ -167,4 +167,4 @@ def to_angles(
     """
     angles_xs = np.rad2deg(np.arctan(midpoints_xs / distance_detector_mask))
     angles_ys = np.rad2deg(np.arctan(midpoints_ys / distance_detector_mask))
-    return Bins2D(x=angles_xs, y=angles_ys)
+    return BinsRectangular(x=angles_xs, y=angles_ys)
