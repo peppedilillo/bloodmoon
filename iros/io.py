@@ -212,6 +212,7 @@ class MaskDataLoader:
                 "mask_maxy": h["MAXY"],
                 "mask_deltax": h["ELXDIM"],
                 "mask_deltay": h["ELYDIM"],
+                "mask_thickness": h["MASKTHK"],
                 "slit_deltax": h["DXSLIT"],
                 "slit_deltay": h["DYSLIT"],
                 "detector_minx": h["PLNXMIN"],
@@ -303,6 +304,7 @@ def fetch_mask(filepath: str | Path) -> MaskDataLoader:
 ain't all these 
 dataclasses
 too much?
+
 ⠀⠀⠀⠀⠀⠀⣀⣠⣤⣤⣤⣤⣀⡀
 ⠀⠀⠀⣠⡶⡿⢿⣿⣛⣟⣿⡿⢿⢿⣷⣦⡀
 ⠀⢰⣯⣷⣿⣿⣿⢟⠃⢿⣟⣿⣿⣾⣷⣽⣺⢆⠀
