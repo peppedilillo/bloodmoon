@@ -1,16 +1,23 @@
-from functools import cache
 from bisect import bisect
+from functools import cache
 
-from iros.io import fetch_simulation
-from iros.mask import fetch_camera, count, decode, UpscaleFactor, CodedMaskCamera
-from iros.images import argmax, _interpmax, _rbilinear, _chop, _shift, shadowgram
-
-from iros.assets import path_wfm_mask
-
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import minimize
 
-import matplotlib.pyplot as plt
+from iros.assets import path_wfm_mask
+from iros.images import _chop
+from iros.images import _interpmax
+from iros.images import _rbilinear
+from iros.images import _shift
+from iros.images import argmax
+from iros.images import shadowgram
+from iros.io import fetch_simulation
+from iros.mask import CodedMaskCamera
+from iros.mask import count
+from iros.mask import decode
+from iros.mask import fetch_camera
+from iros.mask import UpscaleFactor
 
 
 def erode(
@@ -97,7 +104,8 @@ def shift2pos(camera, shift_x, shift_y):
 #     model_normalized = model_template(camera, posweights)
 #     return decode(camera, model_normalized * flux)
 
-from iros.mask import _detector_footprint, _shift
+from iros.mask import _detector_footprint
+from iros.mask import _shift
 
 
 def compute_model(camera, shift_x, shift_y, flux):

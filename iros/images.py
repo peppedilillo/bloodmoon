@@ -4,10 +4,11 @@ from typing import Callable, Optional
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
-from iros.mask import _bisect_interval, CodedMaskCamera, _detector_footprint
-from iros.types import BinsRectangular
+from iros.mask import _bisect_interval
+from iros.mask import _detector_footprint
 from iros.mask import CodedMaskCamera
 from iros.mask import UpscaleFactor
+from iros.types import BinsRectangular
 
 
 def compose(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, Callable]:
@@ -235,8 +236,8 @@ def _chop(camera: CodedMaskCamera, pos: tuple[int, int]) -> tuple[tuple, BinsRec
     min_i, max_i = _bisect_interval(bins.y, bins.y[i] - camera.mdl["slit_deltay"] / packing_y, bins.y[i] + camera.mdl["slit_deltay"] / packing_y)
     min_j, max_j = _bisect_interval(bins.x, bins.x[j] - camera.mdl["slit_deltax"] / packing_x, bins.x[j] + camera.mdl["slit_deltax"] / packing_x)
     return (min_i, max_i, min_j, max_j), BinsRectangular(
-        x=bins.x[min_j:max_j + 1],
-        y=bins.y[min_i:max_i + 1],
+        x=bins.x[min_j : max_j + 1],
+        y=bins.y[min_i : max_i + 1],
     )
 
 
@@ -340,10 +341,10 @@ def _convolution_kernel_psfy(camera) -> np.array:
     """
     bins = camera.bins_detector
     min_bin, max_bin = _bisect_interval(bins.y, -camera.mdl["slit_deltay"], camera.mdl["slit_deltay"])
-    bin_edges = bins.y[min_bin: max_bin + 1]
+    bin_edges = bins.y[min_bin : max_bin + 1]
     midpoints = (bin_edges[1:] + bin_edges[:-1]) / 2
     kernel = psfy_wfm(midpoints).reshape(len(midpoints), -1)
-    kernel = kernel / np. sum(kernel)
+    kernel = kernel / np.sum(kernel)
     return kernel
 
 
@@ -382,11 +383,7 @@ def _shift(a: np.array, shift_ext: tuple[int, int]) -> np.array:
     return hpadded
 
 
-def _erosion(
-        arr: np.array,
-        step: float,
-        cut: float
-) -> np.array:
+def _erosion(arr: np.array, step: float, cut: float) -> np.array:
     """
     2D matrix erosion for simulating finite thickness effect in shadow projections.
     It takes a mask array and "thins" the mask elements across the columns' direction.
@@ -441,20 +438,17 @@ def _erosion(
         arr_ = arr
 
     # fix borders
-    decimal = (ncuts - 2 * nshifts)
+    decimal = ncuts - 2 * nshifts
 
     # this is why we only accept integer array inputs.
-    _lborder_mask = (arr_ - _shift(arr_, (0, +1)) > 0)
-    _rborder_mask = (arr_ - _shift(arr_, (0, -1)) > 0)
+    _lborder_mask = arr_ - _shift(arr_, (0, +1)) > 0
+    _rborder_mask = arr_ - _shift(arr_, (0, -1)) > 0
     lborder_mask = _lborder_mask & (~_rborder_mask)
     rborder_mask = _rborder_mask & (~_lborder_mask)
     cborder_mask = _lborder_mask & _rborder_mask
 
     return (
-            arr_ +
-            (1 - decimal / 2) * lborder_mask - arr_ * lborder_mask +
-            (1 - decimal / 2) * rborder_mask - arr_ * rborder_mask +
-            (1 - decimal) * cborder_mask - arr_ * cborder_mask
+        arr_ + (1 - decimal / 2) * lborder_mask - arr_ * lborder_mask + (1 - decimal / 2) * rborder_mask - arr_ * rborder_mask + (1 - decimal) * cborder_mask - arr_ * cborder_mask
     )
 
 

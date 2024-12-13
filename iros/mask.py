@@ -10,8 +10,8 @@ import numpy as np
 from scipy.signal import correlate
 from scipy.stats import binned_statistic_2d
 
-from .io import MaskDataLoader
 from .coords import to_angles
+from .io import MaskDataLoader
 from .types import BinsRectangular
 
 
@@ -125,6 +125,8 @@ i swear
 　 　 │　　|　|　|
 　／￣|　　 |　|　|
 　| (￣ヽ＿_ヽ_)__) """
+
+
 @dataclass(frozen=True)
 class CodedMaskCamera:
     """Dataclass containing a coded mask camera system.
