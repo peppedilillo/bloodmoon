@@ -1,7 +1,9 @@
 import numpy as np
 
+from .types import Bins2D, BinsEquatorial
 
-def get_rotation_matrices(
+
+def _rotation_matrices(
     pointing_radec_z: tuple[float, float],
     pointing_radec_x: tuple[float, float],
 ) -> tuple[np.array, np.array]:
@@ -70,7 +72,7 @@ def to_sky_coordinates(
     pointing_radec_z: tuple[float, float],
     pointing_radec_x: tuple[float, float],
     distance_detector_mask: float,
-) -> tuple[np.array, np.array]:
+) -> BinsEquatorial:
     """
     Converts sky-shift coordinates to equatorial sky coordinates (RA/Dec).
 
@@ -97,9 +99,9 @@ def to_sky_coordinates(
             spatial units as midpoints_xs and midpoints_ys.
 
     Returns:
-        tuple[np.array, np.array]: A tuple containing:
-            - declinations (np.array): Grid of declination values in degrees, same shape as input arrays
-            - right_ascensions (np.array): Grid of right ascension values in degrees, same shape as input arrays.
+        BinsEquatorial record containing:
+            - `dec` field: Grid of declination values in degrees, same shape as input arrays
+            - `ra` field: Grid of right ascension values in degrees, same shape as input arrays.
               Values are in the range [0, 360] degrees.
 
     Notes:
@@ -107,7 +109,7 @@ def to_sky_coordinates(
         - The output RA values are normalized to [0, 360) degrees
         - The output Dec values are in the range [-90, 90] degrees
     """
-    rotmat_sky2cam, rotmat_cam2sky = get_rotation_matrices(
+    rotmat_sky2cam, rotmat_cam2sky = _rotation_matrices(
         pointing_radec_z,
         pointing_radec_x,
     )
@@ -136,14 +138,14 @@ def to_sky_coordinates(
     ras[ras < 0] += 2 * np.pi
     decs = np.rad2deg(decs.reshape(midpoints_sky_xs.shape))
     ras = np.rad2deg(ras.reshape(midpoints_sky_ys.shape))
-    return decs, ras
+    return BinsEquatorial(ra=ras, dec=decs)
 
 
 def to_angles(
     midpoints_xs: np.array,
     midpoints_ys: np.array,
     distance_detector_mask: float,
-) -> tuple[np.array, np.array]:
+) -> Bins2D:
     """
     Expresses the sky-shift coordinates in terms of angle between source and the detector center.
 
@@ -157,12 +159,12 @@ def to_angles(
 
 
     Returns:
-        tuple[np.array, np.array]: A tuple containing:
-            - angles_xs (np.array): Angular offsets in the X direction in degrees.
+        Bins2D record containing:
+            - `x` field: Angular offsets in the X direction in degrees.
               Negative angles indicate positions left of center. Same shape as input arrays.
-            - angles_ys (np.array): Angular offsets in the Y direction in degrees.
+            - `y` field: Angular offsets in the Y direction in degrees.
               Negative angles indicate positions below center. Same shape as input arrays.
     """
     angles_xs = np.rad2deg(np.arctan(midpoints_xs / distance_detector_mask))
     angles_ys = np.rad2deg(np.arctan(midpoints_ys / distance_detector_mask))
-    return angles_xs, angles_ys
+    return Bins2D(x=angles_xs, y=angles_ys)

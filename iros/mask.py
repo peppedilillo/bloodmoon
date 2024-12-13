@@ -1,7 +1,6 @@
 from bisect import bisect_left
 from bisect import bisect_right
 from dataclasses import dataclass
-from functools import cache
 from functools import cached_property
 from pathlib import Path
 from typing import NamedTuple
@@ -12,18 +11,8 @@ from scipy.signal import correlate
 from scipy.stats import binned_statistic_2d
 
 from .io import MaskDataLoader
-
-
-class Bins2D(NamedTuple):
-    """Two-dimensional binning structure for mask and detector coordinates.
-
-    Args:
-        x: Array of x-coordinate bin edges
-        y: Array of y-coordinate bin edges
-    """
-
-    x: np.array
-    y: np.array
+from .coords import to_angles
+from .types import Bins2D
 
 
 def _bin(
@@ -136,8 +125,6 @@ i swear
 　 　 │　　|　|　|
 　／￣|　　 |　|　|
 　| (￣ヽ＿_ヽ_)__) """
-
-
 @dataclass(frozen=True)
 class CodedMaskCamera:
     """Dataclass containing a coded mask camera system.
@@ -165,7 +152,7 @@ class CodedMaskCamera:
             _bin(self.mdl["mask_miny"], self.mdl["mask_maxy"], self.mdl["mask_deltay"] / upscale_f.y),
         )
 
-    @property
+    @cached_property
     def bins_mask(self) -> Bins2D:
         """Binning structure for the mask pattern."""
         return self._bins_mask(self.upscale_f)
@@ -180,7 +167,7 @@ class CodedMaskCamera:
             _bin(bins.y[ymin], bins.y[ymax], self.mdl["mask_deltay"] / upscale_f.y),
         )
 
-    @property
+    @cached_property
     def bins_detector(self) -> Bins2D:
         """Binning structure for the detector."""
         return self._bins_detector(self.upscale_f)
@@ -197,9 +184,15 @@ class CodedMaskCamera:
             np.linspace(binsd.y[0] + binsm.y[0] + ystep, binsd.y[-1] + binsm.y[-1], self.sky_shape[0] + 1),
         )
 
-    @property
+    @cached_property
     def bins_sky(self) -> Bins2D:
+        """Returns bins for the sky-shift domain"""
         return self._bins_sky(self.upscale_f)
+
+    @cached_property
+    def bins_angle_sky(self) -> Bins2D:
+        """Returns bins for the sky-shift domain"""
+        return Bins2D(*to_angles(self.bins_sky.x, self.bins_sky.y, self.mdl["mask_detector_distance"]))
 
     @cached_property
     def mask(self) -> np.array:
@@ -226,7 +219,7 @@ class CodedMaskCamera:
         """2D array representing the correlation between decoder and bulk patterns."""
         return correlate(self.decoder, self.bulk, mode="full")
 
-    @property
+    @cached_property
     def detector_shape(self) -> tuple[int, int]:
         """Shape of the detector array (rows, columns)."""
         xmin = np.floor(self.mdl["detector_minx"] / (self.mdl["mask_deltax"] / self.upscale_f.x))
@@ -235,7 +228,7 @@ class CodedMaskCamera:
         ymax = np.ceil(self.mdl["detector_maxy"] / (self.mdl["mask_deltay"] / self.upscale_f.y))
         return int(ymax - ymin), int(xmax - xmin)
 
-    @property
+    @cached_property
     def mask_shape(self) -> tuple[int, int]:
         """Shape of the mask array (rows, columns)."""
         return (
@@ -243,7 +236,7 @@ class CodedMaskCamera:
             int((self.mdl["mask_maxx"] - self.mdl["mask_minx"]) / (self.mdl["mask_deltax"] / self.upscale_f.x)),
         )
 
-    @property
+    @cached_property
     def sky_shape(self) -> tuple[int, int]:
         """Shape of the reconstructed sky image (rows, columns)."""
         n, m = self.detector_shape
@@ -393,9 +386,8 @@ def _shift(a: np.array, shift_ext: tuple[int, int]) -> np.array:
     return hpadded
 
 
-@cache
 def _detector_footprint(camera: CodedMaskCamera) -> tuple[int, int, int, int]:
-    """Cached helper."""
+    """Shadowgram helper function."""
     bins_detector = camera.bins_detector
     bins_mask = camera.bins_mask
     i_min, i_max = _bisect_interval(bins_mask.y, bins_detector.y[0], bins_detector.y[-1])
