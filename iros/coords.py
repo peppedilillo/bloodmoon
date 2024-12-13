@@ -2,12 +2,10 @@ import numpy as np
 
 
 def get_rotation_matrices(
-    pointing_radec_z: tuple[float, float] | np.array,
-    pointing_radec_x: tuple[float, float] | np.array,
+    pointing_radec_z: tuple[float, float],
+    pointing_radec_x: tuple[float, float],
 ) -> tuple[np.array, np.array]:
     """
-    Calculates rotation matrices between Earth equatorial and camera reference frames.
-
     This function computes two 3x3 rotation matrices that transform coordinates between
     the Earth equatorial reference frame (RA/Dec) and the camera's local reference frame.
     The transformation is defined by specifying the camera's z-axis and x-axis directions
@@ -67,19 +65,19 @@ def get_rotation_matrices(
 
 
 def to_sky_coordinates(
-    midpoints_xs: np.array,
-    midpoints_ys: np.array,
+    midpoints_sky_xs: np.array,
+    midpoints_sky_ys: np.array,
     pointing_radec_z: tuple[float, float],
     pointing_radec_x: tuple[float, float],
     distance_detector_mask: float,
 ) -> tuple[np.array, np.array]:
     """
-    Converts detector plane coordinates to equatorial sky coordinates (RA/Dec).
+    Converts sky-shift coordinates to equatorial sky coordinates (RA/Dec).
 
     This function performs a coordinate transformation from a rectangular grid of points
-    on a detector/mask plane to their corresponding positions in the sky using equatorial
+    on a sky-shift plane to their corresponding positions in the sky using equatorial
     coordinates. To achieve the transformation it requires the pointings in equatorial
-    cooridnates of the x and z axis of the camera.
+    coordinates of the x and z axis of the camera.
 
     The transformation process involves:
     1. Converting detector plane coordinates to direction vectors
@@ -87,9 +85,9 @@ def to_sky_coordinates(
     3. Converting the rotated vectors to spherical coordinates (RA/Dec)
 
     Args:
-        midpoints_xs (np.array): X coordinates of the grid points on the detector plane in spatial units
+        midpoints_sky_xs (np.array): X coordinates of the grid points on the sky-shift plane in spatial units
             (e.g., mm or cm). Shape and dimension should match midpoints_ys.
-        midpoints_ys (np.array): Y coordinates of the grid points on the detector plane in spatial units
+        midpoints_sky_ys (np.array): Y coordinates of the grid points on the sky-shift plane in spatial units
             (e.g., mm or cm). Shape and dimension should match midpoints_xs.
         pointing_radec_z (tuple[float, float]): Pointing direction of the detector's z-axis in
             (RA, Dec) coordinates in degrees.
@@ -105,7 +103,6 @@ def to_sky_coordinates(
               Values are in the range [0, 360] degrees.
 
     Notes:
-        - The function assumes a right-handed coordinate system for the detector plane
         - Inputs (midpoints_xs, midpoints_ys,  distance_detector_mask) should be in a consistent unit system
         - The output RA values are normalized to [0, 360) degrees
         - The output Dec values are in the range [-90, 90] degrees
@@ -115,10 +112,14 @@ def to_sky_coordinates(
         pointing_radec_x,
     )
     # point distances from the mask center.
-    r = np.sqrt(midpoints_xs * midpoints_xs + midpoints_ys * midpoints_ys + distance_detector_mask * distance_detector_mask)
+    r = np.sqrt(
+        midpoints_sky_xs * midpoints_sky_xs +
+        midpoints_sky_ys * midpoints_sky_ys +
+        distance_detector_mask * distance_detector_mask
+    )
     # these are the versors from the mask center to the detector elements
-    versors_local_xs = -midpoints_xs / r
-    versors_local_ys = -midpoints_ys / r
+    versors_local_ys = midpoints_sky_ys / r  # TODO: for reasons, francesco ceraudo has a minus here. double check.
+    versors_local_xs = midpoints_sky_xs / r  # TODO: for reasons, francesco ceraudo has a minus here. double check.
     versors_local_zs = distance_detector_mask / r
     # this multiplies all detector vectors with the rotation matrix
     _v = np.hstack(
@@ -133,8 +134,8 @@ def to_sky_coordinates(
     decs = 0.5 * np.pi - np.arccos(versors_eq[:, 2].ravel())
     ras = np.arctan2(versors_eq[:, 1].ravel(), versors_eq[:, 0].ravel())
     ras[ras < 0] += 2 * np.pi
-    decs = np.rad2deg(decs.reshape(midpoints_xs.shape))
-    ras = np.rad2deg(ras.reshape(midpoints_ys.shape))
+    decs = np.rad2deg(decs.reshape(midpoints_sky_xs.shape))
+    ras = np.rad2deg(ras.reshape(midpoints_sky_ys.shape))
     return decs, ras
 
 
@@ -144,12 +145,12 @@ def to_angles(
     distance_detector_mask: float,
 ) -> tuple[np.array, np.array]:
     """
-    Expresses the mask elements in terms of angle between them and the detector center.
+    Expresses the sky-shift coordinates in terms of angle between source and the detector center.
 
     Args:
-        midpoints_xs (np.array): X coordinates of the grid points on the detector plane in spatial units
+        midpoints_xs (np.array): X coordinates of the grid points on the sky-shift plane in spatial units
             (e.g., mm or cm). Shape and dimension should match midpoints_ys.
-        midpoints_ys (np.array): Y coordinates of the grid points on the detector plane in spatial units
+        midpoints_ys (np.array): Y coordinates of the grid points on the sky-shift plane in spatial units
             (e.g., mm or cm). Shape and dimension should match midpoints_xs.
         distance_detector_mask (float): Distance between the detector and mask planes in the same
             spatial units as midpoints_xs and midpoints_ys.
