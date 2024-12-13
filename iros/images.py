@@ -1,20 +1,16 @@
 from bisect import bisect
-from functools import cache
-from functools import partial
 from typing import Callable, Optional
 
 import numpy as np
-from scipy.integrate import trapezoid
 from scipy.interpolate import RegularGridInterpolator
-from scipy.signal import convolve
 
-from iros.mask import _bisect_interval
-from iros.mask import Bins2D
+from iros.mask import _bisect_interval, CodedMaskCamera, _detector_footprint
+from iros.types import BinsRectangular
 from iros.mask import CodedMaskCamera
 from iros.mask import UpscaleFactor
 
 
-def compose(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, Callable[[int, int], tuple[Optional[tuple[int, int]], Optional[tuple[int, int]]]]]:
+def compose(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, Callable]:
     """
     Composes two matrices `a` and `b` into one square embedding.
     The `b` matrix is rotated by 90 degree *clockwise*,
@@ -56,6 +52,14 @@ def compose(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, Callable[[int, in
                                doesn't map to a
                        - pos_b: Optional tuple (i,j) in matrix b or None if position
                                doesn't map to b
+                       Full typing signature would be:
+                       Callable[
+                           [int, int], # input, composed matrix index
+                           tuple[
+                               Optional[tuple[int, int]], `a` matrix index
+                               Optional[tuple[int, int]]  `b` matrix index
+                           ]
+                       ]
 
     Raises:
         AssertionError: If matrices a and b have different shapes
@@ -138,10 +142,11 @@ def argmax(composed: np.ndarray) -> tuple[int, int]:
     Returns:
         Tuple of (row, col) indices of maximum value
     """
-    return tuple(map(int, np.unravel_index(np.argmax(composed), composed.shape)))
+    row, col = np.unravel_index(np.argmax(composed), composed.shape)
+    return int(row), int(col)
 
 
-def rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array) -> dict[tuple, float]:
+def _rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array) -> dict[tuple, float]:
     """
     Reverse bilinear interpolation weights for a point in a 2D grid.
     Y coordinates are supposed to grow top to bottom.
@@ -176,11 +181,11 @@ def rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array) -> dict[
     b = (i, j + 1) if deltax > 0 else (i, j - 1)
     c = (i + 1, j) if deltay > 0 else (i - 1, j)
 
-    if deltax > 0 and deltay < 0:
+    if deltax > 0 > deltay:
         d = (i - 1, j + 1)
     elif deltax > 0 and deltay > 0:
         d = (i + 1, j + 1)
-    elif deltax < 0 and deltay > 0:
+    elif deltax < 0 < deltay:
         d = (i + 1, j - 1)
     else:
         d = (i - 1, j - 1)
@@ -197,7 +202,6 @@ def rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array) -> dict[
     return {k: v / total for k, v in weights.items()}
 
 
-@cache
 def _packing_factor(camera: CodedMaskCamera) -> tuple[float, float]:
     """
     Returns the density of slits along the x and y axis.
@@ -211,33 +215,32 @@ def _packing_factor(camera: CodedMaskCamera) -> tuple[float, float]:
     rows_notnull = camera.mask[np.any(camera.mask != 0, axis=1), :]
     cols_notnull = camera.mask[:, np.any(camera.mask != 0, axis=0)]
     pack_x, pack_y = np.mean(np.mean(rows_notnull, axis=1)), np.mean(np.mean(cols_notnull, axis=0))
-    return tuple(map(float, (pack_x, pack_y)))
+    return float(pack_x), float(pack_y)
 
 
-def chop(camera: CodedMaskCamera, pos: tuple[int, int], sky: np.array) -> tuple[np.array, Bins2D]:
+def _chop(camera: CodedMaskCamera, pos: tuple[int, int]) -> tuple[tuple, BinsRectangular]:
     """
-    Returns a slice of `sky` centered around `pos` and sized slightly larger than slit size.
+    Returns a slice of sky centered around `pos` and sized slightly larger than slit size.
 
     Args:
         camera: a CodedMaskCameraObject.
         pos: the (row, col) indeces of the slice center.
-        sky: a sky image.
 
     Returns:
-        A tuple of the slice value and its bins.
+        A tuple of the slice value (length n) and its bins (length n + 1).
     """
     bins = camera.bins_sky
     i, j = pos
     packing_x, packing_y = map(lambda x: x * 2, _packing_factor(camera))
     min_i, max_i = _bisect_interval(bins.y, bins.y[i] - camera.mdl["slit_deltay"] / packing_y, bins.y[i] + camera.mdl["slit_deltay"] / packing_y)
     min_j, max_j = _bisect_interval(bins.x, bins.x[j] - camera.mdl["slit_deltax"] / packing_x, bins.x[j] + camera.mdl["slit_deltax"] / packing_x)
-    return sky[min_i:max_i, min_j:max_j], Bins2D(
-        x=bins.x[min_j : max_j + 1],
-        y=bins.y[min_i : max_i + 1],
+    return (min_i, max_i, min_j, max_j), BinsRectangular(
+        x=bins.x[min_j:max_j + 1],
+        y=bins.y[min_i:max_i + 1],
     )
 
 
-def _interp(tile: np.array, bins: Bins2D, interp_f):
+def _interp(tile: np.array, bins: BinsRectangular, interp_f):
     """
     Upscales a regular grid of data and interpolates with cubic splines.
 
@@ -257,10 +260,10 @@ def _interp(tile: np.array, bins: Bins2D, interp_f):
     interp = RegularGridInterpolator((midpoints_x, midpoints_y), tile.T, method="cubic")
     grid_x_fine, grid_y_fine = np.meshgrid(midpoints_x_fine, midpoints_y_fine)
     tile_interp = interp((grid_x_fine, grid_y_fine))
-    return tile_interp, Bins2D(x=midpoints_x_fine, y=midpoints_y_fine)
+    return tile_interp, BinsRectangular(x=midpoints_x_fine, y=midpoints_y_fine)
 
 
-def interpmax(camera: CodedMaskCamera, pos, sky, interp_f: UpscaleFactor = UpscaleFactor(10, 10)):
+def _interpmax(camera: CodedMaskCamera, pos, sky, interp_f: UpscaleFactor = UpscaleFactor(10, 10)):
     """
     Interpolates and maximizes data around pos.
 
@@ -273,54 +276,207 @@ def interpmax(camera: CodedMaskCamera, pos, sky, interp_f: UpscaleFactor = Upsca
     Returns:
         Sky-shift position of the interpolated maximum.
     """
-    tile_interp, bins_fine = _interp(*chop(camera, pos, sky), interp_f)
+    (min_i, max_i, min_j, max_j), bins = _chop(camera, pos)
+    tile_interp, bins_fine = _interp(sky[min_i:max_i, min_j:max_j], bins, interp_f)
     max_tile_i, max_tile_j = argmax(tile_interp)
     return tuple(map(float, (bins_fine.x[max_tile_j], bins_fine.y[max_tile_i])))
 
 
-params_psfx = {
+# TODO: These should go to a separate configuration file
+_PSFX_WFM_PARAMS = {
     "center": 0,
     "alpha": 0.0016,
     "beta": 0.6938,
 }
 
-params_psfy = {
+_PSFY_WFM_PARAMS = {
     "center": 0,
-    "alpha": 0.3214,
-    "beta": 0.6246,
+    "alpha": 0.2592,
+    "beta": 0.5972,
 }
 
 
-def modsech(x, norm, center, alpha, beta):
+def _modsech(x: np.array, norm: float, center: float, alpha: float, beta: float) -> np.array:
+    """
+    PSF fitting function template.
+
+    Args:
+        x: a numpy array or value, in millimeters
+        norm: normalization parameter
+        center: center parameter
+        alpha: alpha shape parameter
+        beta: beta shape parameter
+
+    Returns:
+        numpy array or value, depending on the input
+    """
     return norm / np.cosh(np.abs((x - center) / alpha) * beta)
 
 
-psfx = partial(modsech, norm=1.0, **params_psfx)
-psfy = partial(modsech, norm=1.0, **params_psfy)
+def psfy_wfm(x: np.array) -> np.array:
+    """
+    PSF function in y direction as fitted from WFM simulations.
+
+    Args:
+        x: a numpy array or value, in millimeters
+
+    Returns:
+        numpy array or value
+    """
+    return _modsech(x, **_PSFY_WFM_PARAMS)
 
 
-def norm_constant(center, alpha, beta):
-    xs = np.linspace(-50 * alpha, +50 * alpha, 10000)
-    return 1 / trapezoid(
-        y=modsech(xs, norm=1, center=center, alpha=alpha, beta=beta),
-        x=xs,
+def _convolution_kernel_psfy(camera) -> np.array:
+    """
+    Returns PSF convolution kernel.
+    At present, it ignores the `x` direction, since PSF characteristic lenght is much shorter
+    than typical bin size, even at moderately large upscales.
+
+    Args:
+        camera: a CodedMaskCamera object.
+
+    Returns:
+        A column array convolution kernel.
+    """
+    bins = camera.bins_detector
+    min_bin, max_bin = _bisect_interval(bins.y, -camera.mdl["slit_deltay"], camera.mdl["slit_deltay"])
+    bin_edges = bins.y[min_bin: max_bin + 1]
+    midpoints = (bin_edges[1:] + bin_edges[:-1]) / 2
+    kernel = psfy_wfm(midpoints).reshape(len(midpoints), -1)
+    kernel = kernel / np. sum(kernel)
+    return kernel
+
+
+def _shift(a: np.array, shift_ext: tuple[int, int]) -> np.array:
+    """Shifts a 2D numpy array by the specified amount in each dimension.
+    This exists because the scipy.ndimage one is slow.
+
+    Args:
+        a: Input 2D numpy array to be shifted.
+        shift_ext: Tuple of (row_shift, column_shift) where positive values shift down/right
+            and negative values shift up/left. Values larger than array dimensions
+            result in an array of zeros.
+
+    Returns:
+        np.array: A new array of the same shape as the input, with elements shifted
+            and empty spaces filled with zeros.
+
+    Examples:
+        >>> arr = np.array([[1, 2], [3, 4]])
+        >>> _shift(arr, (1, 0))  # Shift down by 1
+        array([[0, 0],
+               [1, 2]])
+        >>> _shift(arr, (0, -1))  # Shift left by 1
+        array([[2, 0],
+               [4, 0]])
+    """
+    n, m = a.shape
+    shift_i, shift_j = shift_ext
+    if abs(shift_i) >= n or abs(shift_j) >= m:
+        # we won't load into memory your 66666666 x 6666666666 bullshit matrix
+        return np.zeros_like(a)
+    vpadded = np.pad(a, ((0 if shift_i < 0 else shift_i, 0 if shift_i >= 0 else -shift_i), (0, 0)))
+    vpadded = vpadded[:n, :] if shift_i > 0 else vpadded[-n:, :]
+    hpadded = np.pad(vpadded, ((0, 0), (0 if shift_j < 0 else shift_j, 0 if shift_j >= 0 else -shift_j)))
+    hpadded = hpadded[:, :m] if shift_j > 0 else hpadded[:, -m:]
+    return hpadded
+
+
+def _erosion(
+        arr: np.array,
+        step: float,
+        cut: float
+) -> np.array:
+    """
+    2D matrix erosion for simulating finite thickness effect in shadow projections.
+    It takes a mask array and "thins" the mask elements across the columns' direction.
+
+    Comes with NO safeguards: setting cuts larger than step may remove slits or make them negative.
+
+    ⢯⣽⣿⣿⣿⠛⠉⠀⠀⠉⠉⢛⢟⡻⣟⡿⣿⢿⣿⣿⢿⣻⣟⡿⣟⡿⣿⣻⣟⣿⣟⣿⣻⣟⡿⣽⣻⠿⣽⣻⢟⡿⣽⢫⢯⡝
+    ⢯⣞⣷⣻⠤⢀⠀⠀⠀⠀⠀⠀⠀⠑⠌⢳⡙⣮⢳⣭⣛⢧⢯⡽⣏⣿⣳⢟⣾⣳⣟⣾⣳⢯⣽⣳⢯⣟⣷⣫⢿⣝⢾⣫⠗⡜
+    ⡿⣞⡷⣯⢏⡴⢀⠀⠀⣀⣤⠤⠀⠀⠀⠀⠑⠈⠇⠲⡍⠞⡣⢝⡎⣷⠹⣞⢧⡟⣮⢷⣫⢟⡾⣭⢷⡻⢶⣏⣿⢺⣏⢮⡝⢌
+    ⢷⣹⢽⣚⢮⡒⠆⠀⢰⣿⠁⠀⠀⠀⢱⡆⠀⠀⠈⠀⠀⠄⠁⠊⠜⠬⡓⢬⠳⡝⢮⠣⢏⡚⢵⢫⢞⡽⣏⡾⢧⡿⣜⡣⠞⡠
+    ⢏⣞⣣⢟⡮⡝⣆⢒⠠⠹⢆⡀⠀⢀⠼⠃⣀⠄⡀⢠⠠⢤⡤⣤⢀⠀⠁⠈⠃⠉⠂⠁⠀⠉⠀⠃⠈⠒⠩⠘⠋⠖⠭⣘⠱⡀
+    ⡚⡴⣩⢞⣱⢹⠰⡩⢌⡅⠂⡄⠩⠐⢦⡹⢜⠀⡔⢡⠚⣵⣻⢼⡫⠔⠀⠀⠀⠀⠀⠀⠀⠀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⡄
+    ⡑⠦⡑⢎⡒⢣⢣⡑⢎⡰⢁⡒⢰⢠⢣⠞⢁⠢⡜⢢⢝⣺⡽⢮⠑⡈⠀⠀⠀⢀⡀⠀⣾⡟⠁⠀⠀⠠⡀⠀⠀⠀⠀⠀⠀⠐
+    ⢘⠰⡉⢆⠩⢆⠡⠜⢢⢡⠣⡜⢡⢎⠧⡐⢎⡱⢎⡱⢊⣾⡙⢆⠁⡀⠄⡐⡈⢦⢑⠂⠹⣇⠀⠀⠀⢀⣿⡀⠀⠀⠀⢀⠀⠄
+    ⠈⢆⠱⢈⠒⡈⠜⡈⢆⠢⢱⡘⣎⠞⡰⣉⠎⡴⢋⢰⣻⡞⣍⠂⢈⠔⡁⠆⡑⢎⡌⠎⢡⠈⠑⠂⠐⠋⠁⠀⠀⡀⢆⠠⣉⠂
+    ⡉⠔⡨⠄⢂⡐⠤⡐⣄⢣⢧⡹⡜⢬⡑⡌⢎⡵⢋⣾⡳⡝⠤⢀⠊⡔⡈⢆⡁⠮⡜⠬⢠⢈⡐⡉⠜⡠⢃⠜⣠⠓⣌⠒⠤⡁
+    ⢌⠢⢡⠘⡄⢎⡱⡑⢎⡳⢎⠵⡙⢆⠒⡍⡞⣬⢛⡶⡹⠌⡅⢂⠡⠐⠐⠂⠄⡓⠜⡈⢅⠢⠔⡡⢊⠔⡡⢚⠤⣋⠤⡉⠒⠠
+    ⢢⢑⢢⠱⡘⢦⠱⣉⠞⡴⢫⣜⡱⠂⡬⠜⣵⢊⠷⡸⠥⠑⡌⢂⠠⠃⢀⠉⠠⢜⠨⠐⡈⠆⡱⢀⠣⡘⠤⣉⠒⠄⠒⠠⢁⠡
+    ⢌⡚⡌⢆⠳⣈⠦⣛⠴⣓⠮⣝⠃⠐⡁⠖⣭⢚⡴⢃⠆⢢⠑⡌⠀⠀⠌⠐⠠⢜⠢⡀⠡⠐⠡⠘⠠⢁⠂⡉⠐⡀⠂⠄⡈⠄
+    ⠦⡱⡘⣌⠳⣌⠳⣌⠳⣍⠞⣥⢣⠀⠈⠑⠢⢍⠲⢉⠠⢁⠊⠀⠁⠀⠄⠡⠈⢂⠧⡱⣀⠀⠀⠀⠀⠀⠀⠀⠁⠀⠐⠀⡀⠂
+    ⠂⠥⠑⡠⢃⠌⡓⢌⠳⢌⡹⢄⠣⢆⠀⠀⠀⠈⠀⠀⠀⠀⠀⠈⠀⠀⡌⢢⡕⡊⠔⢡⠂⡅⠂⠀⠀⠀⠀⠀⠐⠈⠀⢀⠀⠀
+    ⠈⠄⠡⠐⠠⠈⠔⣈⠐⢂⠐⡨⠑⡈⠐⡀⠀⠀⠀⠀⠀⠀⠀⡀⢤⡘⠼⣑⢎⡱⢊⠀⠐⡀⠁⠀⠀⠀⠐⠀⠀⢀⠀⠀⠀⠀
+    ⠀⠈⠄⡈⠄⣁⠒⡠⠌⣀⠒⠠⠁⠄⠡⢀⠁⠀⢂⠠⢀⠡⢂⠱⠢⢍⠳⣉⠖⡄⢃⠀⠀⠄⠂⠀⢀⠈⠀⢀⠈⠀⠀⠀⠀⠀
+    ⠀⡁⠆⠱⢨⡐⠦⡑⢬⡐⢌⢢⡉⢄⠃⡄⠂⠁⠠⠀⠄⠂⠄⠡⢁⠊⡑⠌⡒⢌⠢⢈⠀⠄⠂⠁⡀⠀⠂⡀⠄⠂⠀⠀⠀⠀
+    ⠤⠴⣒⠦⣄⠘⠐⠩⢂⠝⡌⢲⡉⢆⢣⠘⠤⣁⢂⠡⠌⡐⠈⠄⢂⠐⡀⠂⢀⠂⠐⠠⢈⠀⡐⠠⠀⠂⢁⠀⠀⠀⠀⠀⠀⠀
+    ⠌⠓⡀⠣⠐⢩⠒⠦⠄⣀⠈⠂⠜⡈⠦⠙⡒⢤⠃⡞⣠⠑⡌⠢⠄⢂⠐⠀⠀⠀⠀⠀⠀⠂⠀⠐⡀⠁⠠⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠁⡀⢈⠈⡑⠢⡙⠤⢒⠆⠤⢁⣀⠂⠁⠐⠁⠊⠔⠡⠊⠄⠂⢀⠀⠀⠀⠀⠀⠂⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠁⠀⠀⠀⡀⠀⠀⠀⠈⠁⠊⠅⠣⠄⡍⢄⠒⠤⠤⢀⣀⣀⣀⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠁⠀⠀⠁⠀⠂⠀⠄⠀⠀⠀⠈⠀⠉⠀⠁⠂⠀⠀⠉⠉⠩⢉⠢⠀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠂⠀⠀⠀⠀⠐⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠄⠁⠄⠀⠀⠀
+
+    Args:
+        arr: 2D input array of integers representing the projected shadow.
+        step: The projection bin step.
+        cut: Maximum cut width.
+
+    Returns:
+        Modified array with shadow effects applied
+    """
+    if not np.issubdtype(arr.dtype, np.integer):
+        raise ValueError("Input array must be of integer type.")
+
+    # how many bins, summing on both sides, should we cut?
+    ncuts = cut / step
+    # remove as many bins as we can by shifting
+    nshifts = int(ncuts // 2)
+    if nshifts:
+        rshift = _shift(arr, (0, +nshifts))
+        lshift = _shift(arr, (0, -nshifts))
+        arr_ = arr * ((rshift > 0) & (lshift > 0))
+    else:
+        arr_ = arr
+
+    # fix borders
+    decimal = (ncuts - 2 * nshifts)
+
+    # this is why we only accept integer array inputs.
+    _lborder_mask = (arr_ - _shift(arr_, (0, +1)) > 0)
+    _rborder_mask = (arr_ - _shift(arr_, (0, -1)) > 0)
+    lborder_mask = _lborder_mask & (~_rborder_mask)
+    rborder_mask = _rborder_mask & (~_lborder_mask)
+    cborder_mask = _lborder_mask & _rborder_mask
+
+    return (
+            arr_ +
+            (1 - decimal / 2) * lborder_mask - arr_ * lborder_mask +
+            (1 - decimal / 2) * rborder_mask - arr_ * rborder_mask +
+            (1 - decimal) * cborder_mask - arr_ * cborder_mask
     )
 
 
-def norm_modsech(center, alpha, beta):
-    norm = norm_constant(center, alpha, beta)
-    return partial(modsech, norm=norm, center=center, alpha=alpha, beta=beta)
+def shadowgram(camera: CodedMaskCamera, source_position: tuple[int, int]) -> np.array:
+    """Fast computation of detector shadowgram for a point source.
 
+    Shifts and crops the mask pattern to generate the detector response.
+    The output is unnormalized and binary (ones and zeros).
 
-norm_psfx = norm_modsech(**params_psfx)
-norm_psfy = norm_modsech(**params_psfy)
+    Does NOT apply bulk correction, nor nomalize.
 
+    Args:
+        camera: CodedMaskCamera instance containing mask pattern and geometry.
+        source_position: Tuple of (i,j) integers specifying source position in sky coordinates,
+            where (sky_shape[0]//2, sky_shape[1]//2) is the center.
 
-def get_kernel(camera):
-    bins = camera.bins_detector
-    min_bin, max_bin = _bisect_interval(np.round(bins.y, 2), -5., +5.)
-    bin_edges = bins.y[min_bin: max_bin + 1]
-    midpoints = (bin_edges[1:] + bin_edges[:-1]) / 2
-    kernel = norm_psfy(midpoints).reshape(len(midpoints), -1)
-    kernel = kernel / np. sum(kernel)
-    return kernel
+    Returns:
+        np.array: Binary detector shadowgram of shape (detector_height, detector_width).
+    """
+    i, j = source_position
+    n, m = camera.sky_shape
+    shift_i, shift_j = (n // 2 - i), (m // 2 - j)
+    shifted_mask = _shift(camera.mask, (shift_i, shift_j))
+    i_min, i_max, j_min, j_max = _detector_footprint(camera)
+    return shifted_mask[i_min:i_max, j_min:j_max]

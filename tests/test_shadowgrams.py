@@ -3,11 +3,10 @@ import unittest
 import numpy as np
 
 from iros.assets import path_wfm_mask
-from iros.mask import _shift
+from iros.images import _shift, shadowgram
 from iros.mask import CodedMaskCamera
 from iros.mask import encode
 from iros.mask import fetch_camera
-from iros.mask import shadowgram
 
 
 class TestArrayShift(unittest.TestCase):

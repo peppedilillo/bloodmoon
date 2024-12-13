@@ -3,7 +3,7 @@ import unittest
 
 import numpy as np
 
-from iros.images import rbilinear
+from iros.images import _rbilinear
 
 
 class TestAntibilinear(unittest.TestCase):
@@ -27,7 +27,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = rbilinear(2.5, 3.5, bins_x, bins_y)
+        weights = _rbilinear(2.5, 3.5, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_off_center_point_top(self):
@@ -44,7 +44,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = rbilinear(2.5, 3.0, bins_x, bins_y)
+        weights = _rbilinear(2.5, 3.0, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_off_center_point_bottom(self):
@@ -61,7 +61,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = rbilinear(2.5, 4.0, bins_x, bins_y)
+        weights = _rbilinear(2.5, 4.0, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_off_center_point_right(self):
@@ -78,7 +78,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = rbilinear(3.0, 3.5, bins_x, bins_y)
+        weights = _rbilinear(3.0, 3.5, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_off_center_point_left(self):
@@ -95,7 +95,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = rbilinear(2.0, 3.5, bins_x, bins_y)
+        weights = _rbilinear(2.0, 3.5, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_grid_corner(self):
@@ -112,7 +112,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = rbilinear(2.0, 2.0, bins_x, bins_y)
+        weights = _rbilinear(2.0, 2.0, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_corner_topleft(self):
@@ -129,7 +129,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = rbilinear(0.1, 0.1, bins_x, bins_y)
+        weights = _rbilinear(0.1, 0.1, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_corner_topright(self):
@@ -146,7 +146,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = rbilinear(4.99, 0.01, bins_x, bins_y)
+        weights = _rbilinear(4.99, 0.01, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_corner_botright(self):
@@ -163,7 +163,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 1.0],
             ]
         )
-        weights = rbilinear(4.99, 6.99, bins_x, bins_y)
+        weights = _rbilinear(4.99, 6.99, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_corner_botleft(self):
@@ -180,7 +180,7 @@ class TestAntibilinear(unittest.TestCase):
                 [1.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = rbilinear(0.01, 6.99, bins_x, bins_y)
+        weights = _rbilinear(0.01, 6.99, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_bottom_side(self):
@@ -197,7 +197,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 1.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = rbilinear(1.5, 6.99, bins_x, bins_y)
+        weights = _rbilinear(1.5, 6.99, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_right_side(self):
@@ -214,7 +214,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = rbilinear(4.99, 3.5, bins_x, bins_y)
+        weights = _rbilinear(4.99, 3.5, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_top_side(self):
@@ -231,7 +231,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = rbilinear(2.5, 0.01, bins_x, bins_y)
+        weights = _rbilinear(2.5, 0.01, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_left_side(self):
@@ -248,23 +248,40 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = rbilinear(0.01, 3.5, bins_x, bins_y)
+        weights = _rbilinear(0.01, 3.5, bins_x, bins_y)
+        self.assertWeightsEqual(weights, expected)
+
+    def test_small_bin_steps(self):
+        bins_x = np.linspace(0, 2.5, 6)
+        bins_y = np.linspace(0, 3.5, 8)
+        expected = np.array(
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.25, 0.25, 0.0, 0.0],
+                [0.0, 0.25, 0.25, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+            ]
+        )
+        weights = _rbilinear(1.0, 1.0, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_invalid_grid(self):
         with self.assertRaises(ValueError):
-            rbilinear(1, 1, np.array([1]), np.array([1, 2]))
+            _rbilinear(1, 1, np.array([1]), np.array([1, 2]))
 
         with self.assertRaises(ValueError):
-            rbilinear(1, 1, np.array([2, 1]), np.array([1, 2]))
+            _rbilinear(1, 1, np.array([2, 1]), np.array([1, 2]))
 
     def test_point_outside_grid(self):
         bins_x = np.array([0, 1, 2])
         bins_y = np.array([0, 1, 2])
         with self.assertRaises(ValueError):
-            rbilinear(-1, 1, bins_x, bins_y)
+            _rbilinear(-1, 1, bins_x, bins_y)
         with self.assertRaises(ValueError):
-            rbilinear(1, 2.1, bins_x, bins_y)
+            _rbilinear(1, 2.1, bins_x, bins_y)
 
 
 if __name__ == "__main__":

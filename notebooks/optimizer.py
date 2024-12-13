@@ -2,8 +2,8 @@ from functools import cache
 from bisect import bisect
 
 from iros.io import fetch_simulation
-from iros.mask import fetch_camera, count, decode, UpscaleFactor, CodedMaskCamera, shadowgram
-from iros.images import argmax, interpmax, rbilinear, chop
+from iros.mask import fetch_camera, count, decode, UpscaleFactor, CodedMaskCamera
+from iros.images import argmax, _interpmax, _rbilinear, _chop, shadowgram
 
 from iros.assets import path_wfm_mask
 
@@ -28,7 +28,7 @@ def model_template(camera, posweights):
 
 
 def compute_model(camera, shift_x, shift_y, flux):
-    components = rbilinear(shift_x, shift_y, *camera.bins_sky)
+    components = _rbilinear(shift_x, shift_y, *camera.bins_sky)
     posweights = tuple(((p, w) for p, w in components.items()))
     model_normalized = model_template(camera, posweights)
     return decode(camera, model_normalized * flux)
@@ -39,7 +39,7 @@ class Optimizer:
         self.camera = camera
 
     def __call__(self, sky):
-        shift_start_x, shift_start_y = interpmax(self.camera, argmax(sky), sky, UpscaleFactor(10, 10))
+        shift_start_x, shift_start_y = _interpmax(self.camera, argmax(sky), sky, UpscaleFactor(10, 10))
         flux_start = sky.max()
 
         print("Starting coarse flux optimization")
@@ -79,8 +79,9 @@ class Optimizer:
     def loss(self, args, sky):
         shift_x, shift_y, flux = args
         model = compute_model(self.camera, *args)
-        truth_chopped, _ = chop(self.camera, shift2pos(self.camera, shift_x, shift_y), sky)
-        model_chopped, _ = chop(self.camera, shift2pos(self.camera, shift_x, shift_y), model)
+        (min_i, max_i, min_j, max_j), _ = _chop(self.camera, shift2pos(self.camera, shift_x, shift_y))
+        truth_chopped = sky[min_i:max_i, min_j:max_j]
+        model_chopped = model[min_i:max_i, min_j:max_j]
         residual = truth_chopped - model_chopped
         loss = np.mean(np.square(residual))
         return loss

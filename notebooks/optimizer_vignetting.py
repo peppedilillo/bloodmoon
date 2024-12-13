@@ -2,8 +2,8 @@ from functools import cache
 from bisect import bisect
 
 from iros.io import fetch_simulation
-from iros.mask import fetch_camera, count, decode, UpscaleFactor, CodedMaskCamera, shadowgram, _shift
-from iros.images import argmax, interpmax, rbilinear, chop
+from iros.mask import fetch_camera, count, decode, UpscaleFactor, CodedMaskCamera
+from iros.images import argmax, _interpmax, _rbilinear, _chop, _shift, shadowgram
 
 from iros.assets import path_wfm_mask
 
@@ -105,7 +105,7 @@ def compute_model(camera, shift_x, shift_y, flux):
     n, m = camera.sky_shape
     i_min, i_max, j_min, j_max = _detector_footprint(camera)
     model = np.zeros(camera.detector_shape)
-    for (pos, weight) in rbilinear(shift_x, shift_y, *camera.bins_sky).items():
+    for (pos, weight) in _rbilinear(shift_x, shift_y, *camera.bins_sky).items():
         i, j = pos
         r, c = (n // 2 - i), (m // 2 - j)
         shifted_mask = _shift(processed_mask, (r, c))
@@ -121,7 +121,7 @@ class Optimizer:
         self.camera = camera
 
     def __call__(self, sky):
-        shift_start_x, shift_start_y = interpmax(self.camera, argmax(sky), sky, UpscaleFactor(10, 10))
+        shift_start_x, shift_start_y = _interpmax(self.camera, argmax(sky), sky, UpscaleFactor(10, 10))
         print(f"Interpolated maximum shift x = {shift_start_x:.3f}mm, y = {shift_start_y:.3f}mm")
         flux_start = sky.max()
 
@@ -164,7 +164,7 @@ class Optimizer:
     def loss(self, args, sky):
         shift_x, shift_y, flux = args
         model = compute_model(self.camera, *args)
-        (min_i, max_i, min_j, max_j), _ = chop(self.camera, shift2pos(self.camera, shift_x, shift_y))
+        (min_i, max_i, min_j, max_j), _ = _chop(self.camera, shift2pos(self.camera, shift_x, shift_y))
         truth_chopped = sky[min_i:max_i, min_j:max_j]
         model_chopped = model[min_i:max_i, min_j:max_j]
         residual = truth_chopped - model_chopped
@@ -202,7 +202,7 @@ def main():
     # sdl = fetch_simulation("/home/deppep/Documents/wfm_sims/id10") # faint crowded
     # sdl = fetch_simulation("/home/deppep/Documents/wfm_sims/id12") # single 4.15
     sdl = fetch_simulation("../../simulations/id00")  # double strong
-    wfm = fetch_camera(path_wfm_mask, (10,1))
+    wfm = fetch_camera(path_wfm_mask, (5, 8))
 
     detector = count(wfm, sdl.detected["cam1a"])
     sky = decode(wfm, detector)
