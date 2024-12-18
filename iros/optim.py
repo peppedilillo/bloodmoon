@@ -184,6 +184,8 @@ def _init_model_fine():
             mask_shifted_processed = _shift(mask_vignetted_psfy_convolved, (r, c))
             framed_shadowgram = mask_shifted_processed[i_min - 1:i_max + 1, j_min - 1:j_max + 1]
 
+            # this makes me suffer, there should be a way to not compute decode four times..
+            # TODO: think how to obtain the same behaviour without four decodings.
             decoded_components = tuple(map(
                 lambda x: decode(camera, x),
                 (normalized_component(camera, framed_shadowgram, rpos) for rpos in relative_positions)
