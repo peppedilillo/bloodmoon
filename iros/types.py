@@ -25,3 +25,15 @@ class BinsEquatorial(NamedTuple):
 
     ra: np.array
     dec: np.array
+
+
+class UpscaleFactor(NamedTuple):
+    """Upscaling factors for x and y dimensions.
+
+    Args:
+        x: Upscaling factor for x dimension
+        y: Upscaling factor for y dimension
+    """
+
+    x: int
+    y: int

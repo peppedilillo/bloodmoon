@@ -1,13 +1,10 @@
 from bisect import bisect
 from typing import Callable, Optional
+from collections import OrderedDict
 
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
-from iros.mask import _bisect_interval
-from iros.mask import _detector_footprint
-from iros.mask import CodedMaskCamera
-from iros.mask import UpscaleFactor
 from iros.types import BinsRectangular
 
 
@@ -147,7 +144,7 @@ def argmax(composed: np.ndarray) -> tuple[int, int]:
     return int(row), int(col)
 
 
-def _rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array) -> dict[tuple, float]:
+def _rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array) -> OrderedDict[tuple, float]:
     """
     Reverse bilinear interpolation weights for a point in a 2D grid.
     Y coordinates are supposed to grow top to bottom.
@@ -160,7 +157,8 @@ def _rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array) -> dict
         bins_y: Sorted array of y-axis grid boundaries
 
     Returns:
-        Dictionary mapping grid point indices to their interpolation weights
+        Ordered dictionary mapping grid point indices to their interpolation weights
+        The first dictionary elements map to the bin whose midpoint is closest to the input.
 
     Raises:
         ValueError: If grid is invalid or point lies outside
@@ -174,7 +172,7 @@ def _rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array) -> dict
 
     i, j = (bisect(bins_y, cy) - 1), bisect(bins_x, cx) - 1
     if i == 0 or j == 0 or i == len(bins_y) - 2 or j == len(bins_x) - 2:
-        return {(i, j): 1.0}
+        return OrderedDict([((i, j), 1.0),])
 
     mx, my = (bins_x[j] + bins_x[j + 1]) / 2, (bins_y[i] + bins_y[i + 1]) / 2
     deltax, deltay = cx - mx, cy - my
@@ -193,52 +191,14 @@ def _rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array) -> dict
 
     xstep, ystep = bins_x[1] - bins_x[0], bins_y[1] - bins_y[0]
     deltax, deltay = map(abs, (deltax, deltay))
-    weights = {
-        a: (ystep - deltay) * (xstep - deltax),
-        b: (ystep - deltay) * deltax,
-        c: (xstep - deltax) * deltay,
-        d: deltay * deltax,
-    }
+    weights = OrderedDict([
+        (a, (ystep - deltay) * (xstep - deltax)),
+        (b, (ystep - deltay) * deltax),
+        (c, (xstep - deltax) * deltay),
+        (d, deltay * deltax),
+    ])
     total = sum(weights.values())
-    return {k: v / total for k, v in weights.items()}
-
-
-def _packing_factor(camera: CodedMaskCamera) -> tuple[float, float]:
-    """
-    Returns the density of slits along the x and y axis.
-
-    Args:
-        camera: a CodedMaskCamera object.
-
-    Returns:
-        A tuple of the x and y packing factors.
-    """
-    rows_notnull = camera.mask[np.any(camera.mask != 0, axis=1), :]
-    cols_notnull = camera.mask[:, np.any(camera.mask != 0, axis=0)]
-    pack_x, pack_y = np.mean(np.mean(rows_notnull, axis=1)), np.mean(np.mean(cols_notnull, axis=0))
-    return float(pack_x), float(pack_y)
-
-
-def _chop(camera: CodedMaskCamera, pos: tuple[int, int]) -> tuple[tuple, BinsRectangular]:
-    """
-    Returns a slice of sky centered around `pos` and sized slightly larger than slit size.
-
-    Args:
-        camera: a CodedMaskCameraObject.
-        pos: the (row, col) indeces of the slice center.
-
-    Returns:
-        A tuple of the slice value (length n) and its bins (length n + 1).
-    """
-    bins = camera.bins_sky
-    i, j = pos
-    packing_x, packing_y = map(lambda x: x * 2, _packing_factor(camera))
-    min_i, max_i = _bisect_interval(bins.y, bins.y[i] - camera.mdl["slit_deltay"] / packing_y, bins.y[i] + camera.mdl["slit_deltay"] / packing_y)
-    min_j, max_j = _bisect_interval(bins.x, bins.x[j] - camera.mdl["slit_deltax"] / packing_x, bins.x[j] + camera.mdl["slit_deltax"] / packing_x)
-    return (min_i, max_i, min_j, max_j), BinsRectangular(
-        x=bins.x[min_j : max_j + 1],
-        y=bins.y[min_i : max_i + 1],
-    )
+    return OrderedDict([(k, v / total) for k, v in weights.items()])
 
 
 def _interp(tile: np.array, bins: BinsRectangular, interp_f):
@@ -262,90 +222,6 @@ def _interp(tile: np.array, bins: BinsRectangular, interp_f):
     grid_x_fine, grid_y_fine = np.meshgrid(midpoints_x_fine, midpoints_y_fine)
     tile_interp = interp((grid_x_fine, grid_y_fine))
     return tile_interp, BinsRectangular(x=midpoints_x_fine, y=midpoints_y_fine)
-
-
-def _interpmax(camera: CodedMaskCamera, pos, sky, interp_f: UpscaleFactor = UpscaleFactor(10, 10)):
-    """
-    Interpolates and maximizes data around pos.
-
-    Args:
-        camera: a CodedMaskCamera object.
-        pos: the (row, col) indeces of the slice center.
-        sky: the sky image.
-        interp_f: a `UpscaleFactor` object representing the upscaling to be applied on the data.
-
-    Returns:
-        Sky-shift position of the interpolated maximum.
-    """
-    (min_i, max_i, min_j, max_j), bins = _chop(camera, pos)
-    tile_interp, bins_fine = _interp(sky[min_i:max_i, min_j:max_j], bins, interp_f)
-    max_tile_i, max_tile_j = argmax(tile_interp)
-    return tuple(map(float, (bins_fine.x[max_tile_j], bins_fine.y[max_tile_i])))
-
-
-# TODO: These should go to a separate configuration file
-_PSFX_WFM_PARAMS = {
-    "center": 0,
-    "alpha": 0.0016,
-    "beta": 0.6938,
-}
-
-_PSFY_WFM_PARAMS = {
-    "center": 0,
-    "alpha": 0.2592,
-    "beta": 0.5972,
-}
-
-
-def _modsech(x: np.array, norm: float, center: float, alpha: float, beta: float) -> np.array:
-    """
-    PSF fitting function template.
-
-    Args:
-        x: a numpy array or value, in millimeters
-        norm: normalization parameter
-        center: center parameter
-        alpha: alpha shape parameter
-        beta: beta shape parameter
-
-    Returns:
-        numpy array or value, depending on the input
-    """
-    return norm / np.cosh(np.abs((x - center) / alpha) * beta)
-
-
-def psfy_wfm(x: np.array) -> np.array:
-    """
-    PSF function in y direction as fitted from WFM simulations.
-
-    Args:
-        x: a numpy array or value, in millimeters
-
-    Returns:
-        numpy array or value
-    """
-    return _modsech(x, **_PSFY_WFM_PARAMS)
-
-
-def _convolution_kernel_psfy(camera) -> np.array:
-    """
-    Returns PSF convolution kernel.
-    At present, it ignores the `x` direction, since PSF characteristic lenght is much shorter
-    than typical bin size, even at moderately large upscales.
-
-    Args:
-        camera: a CodedMaskCamera object.
-
-    Returns:
-        A column array convolution kernel.
-    """
-    bins = camera.bins_detector
-    min_bin, max_bin = _bisect_interval(bins.y, -camera.mdl["slit_deltay"], camera.mdl["slit_deltay"])
-    bin_edges = bins.y[min_bin : max_bin + 1]
-    midpoints = (bin_edges[1:] + bin_edges[:-1]) / 2
-    kernel = psfy_wfm(midpoints).reshape(len(midpoints), -1)
-    kernel = kernel / np.sum(kernel)
-    return kernel
 
 
 def _shift(a: np.array, shift_ext: tuple[int, int]) -> np.array:
@@ -447,30 +323,23 @@ def _erosion(arr: np.array, step: float, cut: float) -> np.array:
     rborder_mask = _rborder_mask & (~_lborder_mask)
     cborder_mask = _lborder_mask & _rborder_mask
 
+    # fmt: off
     return (
-        arr_ + (1 - decimal / 2) * lborder_mask - arr_ * lborder_mask + (1 - decimal / 2) * rborder_mask - arr_ * rborder_mask + (1 - decimal) * cborder_mask - arr_ * cborder_mask
+        arr_ +
+        (1 - decimal / 2) * lborder_mask - arr_ * lborder_mask +
+        (1 - decimal / 2) * rborder_mask - arr_ * rborder_mask +
+        (1 - decimal) * cborder_mask - arr_ * cborder_mask
     )
+    # fmt: on
 
 
-def shadowgram(camera: CodedMaskCamera, source_position: tuple[int, int]) -> np.array:
-    """Fast computation of detector shadowgram for a point source.
-
-    Shifts and crops the mask pattern to generate the detector response.
-    The output is unnormalized and binary (ones and zeros).
-
-    Does NOT apply bulk correction, nor nomalize.
-
-    Args:
-        camera: CodedMaskCamera instance containing mask pattern and geometry.
-        source_position: Tuple of (i,j) integers specifying source position in sky coordinates,
-            where (sky_shape[0]//2, sky_shape[1]//2) is the center.
-
-    Returns:
-        np.array: Binary detector shadowgram of shape (detector_height, detector_width).
-    """
-    i, j = source_position
-    n, m = camera.sky_shape
-    shift_i, shift_j = (n // 2 - i), (m // 2 - j)
-    shifted_mask = _shift(camera.mask, (shift_i, shift_j))
-    i_min, i_max, j_min, j_max = _detector_footprint(camera)
-    return shifted_mask[i_min:i_max, j_min:j_max]
+def _rbilinear_relative(cx: float, cy: float, bins_x: np.array, bins_y: np.array) -> tuple[OrderedDict, tuple[int, int]]:
+    """To avoid computing shifts many time, we create a slightly shadowgram and index over it.
+    This operation requires the results for rbilinear to be expressed relatively to the pivot."""
+    results_rbilinear = _rbilinear(cx, cy, bins_x, bins_y)
+    ((pivot_i, pivot_j), _), *__ = results_rbilinear.items()
+    # noinspection PyTypeChecker
+    return OrderedDict([
+        ((k_i - pivot_i, k_j - pivot_j), w)
+        for (k_i, k_j), w in results_rbilinear.items()
+    ]), (pivot_i, pivot_j)

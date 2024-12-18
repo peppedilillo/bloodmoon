@@ -5,17 +5,14 @@ import numpy as np
 from scipy.optimize import minimize
 
 from iros.assets import path_wfm_mask
-from iros.images import _chop
-from iros.images import _interpmax
 from iros.images import _rbilinear
 from iros.images import argmax
-from iros.images import shadowgram
 from iros.io import fetch_simulation
-from iros.mask import CodedMaskCamera
+from iros.mask import CodedMaskCamera, _chop, _interpmax, shadowgram
 from iros.mask import count
 from iros.mask import decode
 from iros.mask import fetch_camera
-from iros.mask import UpscaleFactor
+from iros.types import UpscaleFactor
 
 
 @cache

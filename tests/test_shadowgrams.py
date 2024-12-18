@@ -4,8 +4,7 @@ import numpy as np
 
 from iros.assets import path_wfm_mask
 from iros.images import _shift
-from iros.images import shadowgram
-from iros.mask import CodedMaskCamera
+from iros.mask import CodedMaskCamera, shadowgram
 from iros.mask import encode
 from iros.mask import fetch_camera
 
