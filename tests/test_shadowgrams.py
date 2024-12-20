@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from iros.assets import path_wfm_mask
+from iros.assets import _path_test_mask
 from iros.images import _shift
 from iros.mask import CodedMaskCamera, shadowgram
 from iros.mask import encode
@@ -91,7 +91,7 @@ def benchmark_shadowgram(camera: CodedMaskCamera, source_position: tuple[int, in
 class TestShadowgram(unittest.TestCase):
     def setUp(self):
         """Set up test data including precomputed benchmark shadowgrams."""
-        self.camera = fetch_camera(path_wfm_mask, (2, 1))
+        self.camera = fetch_camera(_path_test_mask, (2, 1))
         n, m = self.camera.sky_shape
         self.test_positions = [
             (0, 0),  # Top-left corner

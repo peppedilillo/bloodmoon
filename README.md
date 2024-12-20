@@ -10,10 +10,10 @@ Load simulation and mask data with upscaling. Compute detector counts. Compute b
 from iros.io import fetch_simulation
 from iros.mask import fetch_camera, encode, decode, count
 from iros.images import compose, argmax
-from iros.assets import path_wfm_mask
+from iros.assets import _path_test_mask
 
 sdl = fetch_simulation("/home/deppep/Dropbox/Progetti/masks/simulations/id00/")
-wfm = fetch_camera(path_wfm_mask, (5, 8))
+wfm = fetch_camera(_path_test_mask, (5, 8))
 
 detector_1a = count(wfm, sdl.detected["cam1a"])
 balanced_1a, var_1a = decode(wfm, detector_1a)

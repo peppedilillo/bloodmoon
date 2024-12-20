@@ -97,9 +97,9 @@ def _init_model_coarse():
         if cached((shift_x, shift_y)):
             # note we cache the normalized sky model from the normalized shadowgram.
             # hence the sky model should be adjusted by the shift.
-            print("cache hit")
+            # print("cache hit")
             return cache_get() * flux
-        print("cache miss")
+        # print("cache miss")
         sg = model_shadowgram(camera, shift_x, shift_y, 1, vignetting=True, psfy=True)
         cache_set((shift_x, shift_y), decode(camera, sg))
         return cache_get() * flux
@@ -170,10 +170,10 @@ def _init_model_fine():
         components, pivot = _rbilinear_relative(shift_x, shift_y, camera.bins_sky.x, camera.bins_sky.y)
         relative_positions = tuple(components.keys())
         if cached((pivot, *relative_positions)):
-            print("cache hit")
+            # print("cache hit")
             decoded_components = cache_get((pivot, *relative_positions))
         else:
-            print("no cache hit")
+            # print("no cache hit")
             n, m = camera.sky_shape
             pivot_i, pivot_j = pivot
             i_min, i_max, j_min, j_max = _detector_footprint_cached(camera)
@@ -262,7 +262,7 @@ loss_coarse, _, _loss_coarse_cache_clear = _loss(_compute_model_coarse)
 loss_fine, _loss_fine_cache_get, _loss_fine_cache_clear = _loss(_compute_model_fine)
 
 
-def optimize(camera: CodedMaskCamera, sky: np.array, arg_sky: tuple[int, int]):
+def optimize(camera: CodedMaskCamera, sky: np.array, arg_sky: tuple[int, int], verbose: bool = False):
     """
     Perform two-stage optimization to fit a point source model to sky image data.
 
@@ -291,7 +291,7 @@ def optimize(camera: CodedMaskCamera, sky: np.array, arg_sky: tuple[int, int]):
         - Fine stage optimizes all paramete model
         - Bounds are set based on initial guess and physical constraints
     """
-    # TODO: the upscaling factor should go into a configuration file.
+    # TODO: the upscaling factor should probably go into a configuration thing.
     shift_start_x, shift_start_y = _interpmax(camera, arg_sky, sky, UpscaleFactor(10, 10))
     flux_start = sky.max()
 
@@ -304,7 +304,7 @@ def optimize(camera: CodedMaskCamera, sky: np.array, arg_sky: tuple[int, int]):
         ],
         options={
             "maxiter": 10,
-            "iprint": 1,
+            "iprint": 1 if verbose else -1,
             "ftol": 10e-5,
         }
     )
@@ -323,7 +323,7 @@ def optimize(camera: CodedMaskCamera, sky: np.array, arg_sky: tuple[int, int]):
         ],
         options={
             "maxiter": 20,
-            "iprint": 1,
+            "iprint": 1 if verbose else -1,
             "ftol": 10e-4,
         }
     )

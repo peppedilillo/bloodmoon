@@ -1,4 +1,3 @@
 from pathlib import Path
 
-path_wfm_mask = Path(__file__).parent / "wfm_mask.fits"
-path_config = Path(__file__).parent / "config.yml"
+_path_test_mask = Path(__file__).parent / "wfm_mask.fits"

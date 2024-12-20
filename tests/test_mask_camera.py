@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from iros.assets import path_wfm_mask
+from iros.assets import _path_test_mask
 from iros.mask import _bisect_interval
 from iros.mask import decode
 from iros.mask import encode
@@ -12,7 +12,7 @@ from iros.mask import psf
 
 class TestWFM(unittest.TestCase):
     def setUp(self):
-        self.wfm = fetch_camera(path_wfm_mask, (2, 1))
+        self.wfm = fetch_camera(_path_test_mask, (2, 1))
 
     def test_shape_bulk(self):
         self.assertEqual(self.wfm.bulk.shape, self.wfm.detector_shape)
