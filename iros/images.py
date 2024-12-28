@@ -150,6 +150,32 @@ def _rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array) -> Orde
     Y coordinates are supposed to grow top to bottom.
     X coordinates grow left to right.
 
+    The basic idea is to identify for poles and assign weights to it.
+    The more the center is close to a pole, the more weight the pole gets.
+
+
+        │                    │                    │
+    ────┼────────────────────┼────────────────────┼────
+        │  A                 │                 B  │
+        │   ┌────────────────┼───┐  ▲             │
+        │   │         .─.    │   │  │             │
+        │   │        ( c )   │   │  │(1 - dy)     │
+        │   │         `─'    │   │  ▼             │
+    ────┼───┼────────────────┼───┼──▲─────────────┼────
+        │   │           i, j │   │  │dy           │
+        │   └────────────────┼───┘                │
+        │   ◀───────────────▶◀───▶                │
+        │         (1 - dx )  │dx                  │
+        │  C                 │                 D  │
+    ────┼────────────────────┼────────────────────┼────
+        │                    │                    │
+
+    To A (pivot) we assign a weight (1 - dx) * (1 - dy).
+    To B we assign a weight dx * (1 - dy).
+    To C we assign a weight (1 - dx) * dy.
+    To D we assign a weight dx * dy.
+
+
     Args:
         cx: x-coordinate of the point
         cy: y-coordinate of the point

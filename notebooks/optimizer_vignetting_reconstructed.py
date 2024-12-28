@@ -8,7 +8,7 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.signal import convolve
 
-from iros.assets import path_wfm_mask
+from iros.assets import _path_test_mask
 from iros.images import _rbilinear
 from iros.images import _shift
 from iros.images import argmax
@@ -195,7 +195,7 @@ class Optimizer:
 
 
 def plotsky(sky, points=tuple(), title="", vmax=None):
-    fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+    fig, ax = plt.subplots(1, 1, figsize=(7, 7))
     c0 = ax.imshow(sky, vmax=-sky.min() if vmax is None else vmax, vmin=0)
     for p in points:
         ax.scatter(p[1], p[0], s=80, facecolors='none', edgecolors='white')
@@ -206,7 +206,7 @@ def plotsky(sky, points=tuple(), title="", vmax=None):
 
 
 def plotres(sky, model, row, col, camera):
-    fig, axs = plt.subplots(2, 1, figsize=(9, 8))
+    fig, axs = plt.subplots(2, 1, figsize=(7, 7))
     axs[0].stairs((sky - model)[row], edges=camera.bins_sky.x, label="subtracted")
     axs[0].stairs(model[row], edges=camera.bins_sky.x, label="model")
     axs[0].stairs(sky[row], edges=camera.bins_sky.x,  label="truth")
@@ -224,7 +224,8 @@ def main():
     # sdl = fetch_simulation("/home/deppep/Documents/wfm_sims/id10") # faint crowded
     # sdl = fetch_simulation("/home/deppep/Documents/wfm_sims/id12") # single 4.15
     sdl = fetch_simulation("../../simulations/id00")  # double strong
-    wfm = fetch_camera(path_wfm_mask, (8, 1))
+    # sdl = fetch_simulation("/home/deppep/Documents/wfm_sims/20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb")
+    wfm = fetch_camera(_path_test_mask, (5, 3))
 
     detector = count(wfm, sdl.reconstructed["cam1a"])
     sky = decode(wfm, detector)
@@ -245,6 +246,8 @@ def main():
 
 if __name__ == "__main__":
     _plotres, _plotsky = main()
+    _plotres()
+    _plotsky()
 
     # print(f"Computing square sky image.")
     # wfm_ = fetch_camera(path_wfm_mask, (5, 8))

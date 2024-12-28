@@ -4,13 +4,13 @@ from iros.mask import fetch_camera, count, decode, model_sky
 
 from iros.images import argmax
 from iros.io import fetch_simulation
-from iros.assets import path_wfm_mask
+from iros.assets import _path_test_mask
 
 from iros.utils import catchtime
 
 
 def plotsky(sky, points=tuple(), title="", vmax=None):
-    fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+    fig, ax = plt.subplots(1, 1, figsize=(7, 7))
     c0 = ax.imshow(sky, vmax=-sky.min() if vmax is None else vmax, vmin=0)
     for p in points:
         ax.scatter(p[1], p[0], s=80, facecolors='none', edgecolors='white')
@@ -21,7 +21,7 @@ def plotsky(sky, points=tuple(), title="", vmax=None):
 
 
 def plotres(sky, model, row, col, camera):
-    fig, axs = plt.subplots(2, 1, figsize=(9, 8))
+    fig, axs = plt.subplots(2, 1, figsize=(7, 7))
     axs[0].stairs((sky - model)[row], edges=camera.bins_sky.x, label="subtracted")
     axs[0].stairs(model[row], edges=camera.bins_sky.x, label="model")
     axs[0].stairs(sky[row], edges=camera.bins_sky.x,  label="truth")
@@ -39,16 +39,26 @@ def main():
     # sdl = fetch_simulation("/home/deppep/Documents/wfm_sims/id10") # faint crowded
     # sdl = fetch_simulation("/home/deppep/Documents/wfm_sims/id12") # single 4.15
     sdl = fetch_simulation("../../simulations/id00")  # double strong
-    wfm = fetch_camera(path_wfm_mask, (8, 1))
+    wfm = fetch_camera(_path_test_mask, (5, 3))
 
-    detector = count(wfm, sdl.reconstructed["cam1a"])
+    reconstructed = True
+    if reconstructed:
+        detector = count(wfm, sdl.reconstructed["cam1a"])
+        vignetting, psfy = True, True
+    else:
+        detector = count(wfm, sdl.detected["cam1a"])
+        vignetting, psfy = True, False
+
     sky = decode(wfm, detector)
-
-    print(f"Starting optimization.")
+    print("Starting optimization.")
     with catchtime("optimization"):
-        (shift, flux), model, receipt = optimize(wfm, sky, argmax(sky),)
-    print(f"Ended optimization.")
+        shift, flux = optimize(wfm, sky, argmax(sky), vignetting=vignetting, psfy=psfy, verbose=True)
+        print(shift, flux)
+    print(f"Ended optimization with values (x={shift[0]:.2f}, y={shift[1]:.2f}), f={flux:.2f}.")
 
+    print("Starting model computation.")
+    model = model_sky(wfm, *shift, flux, vignetting=vignetting, psfy=psfy)
+    print("Done!")
     return (
         lambda : plotres(sky, model, *argmax(sky), wfm),
         lambda res=True: (

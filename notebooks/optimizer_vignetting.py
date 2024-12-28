@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import minimize
 
-from iros.assets import path_wfm_mask
+from iros.assets import _path_test_mask
 from iros.images import _rbilinear
 from iros.images import _shift
 from iros.images import argmax
@@ -207,7 +207,7 @@ def main():
     # sdl = fetch_simulation("/home/deppep/Documents/wfm_sims/id10") # faint crowded
     # sdl = fetch_simulation("/home/deppep/Documents/wfm_sims/id12") # single 4.15
     sdl = fetch_simulation("../../simulations/id00")  # double strong
-    wfm = fetch_camera(path_wfm_mask, (5, 8))
+    wfm = fetch_camera(_path_test_mask, (5, 8))
 
     detector = count(wfm, sdl.detected["cam1a"])
     sky = decode(wfm, detector)

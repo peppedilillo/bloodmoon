@@ -4,7 +4,7 @@ from functools import cache
 import numpy as np
 from scipy.optimize import minimize
 
-from iros.assets import path_wfm_mask
+from iros.assets import _path_test_mask
 from iros.images import _rbilinear
 from iros.images import argmax
 from iros.io import fetch_simulation
@@ -122,7 +122,7 @@ if __name__ == "__main__":
 
     print(f"Computing first sky image.")
     sdl = fetch_simulation("../../simulations/id13")
-    wfm = fetch_camera(path_wfm_mask, (8, 1))
+    wfm = fetch_camera(_path_test_mask, (8, 1))
 
     detector = count(wfm, sdl.detected["cam1a"])
     sky = decode(wfm, detector)
