@@ -158,6 +158,7 @@ def _rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array) -> Orde
           │  A                 │                 B  │
           │   ┌────────────────┼───┐  ▲             │
           │   │                │   │  │             │
+          │   │                │   │  │             │
           │   │         .─.    │   │  │             │
           │   │        ( c )   │   │  │(1 - dy)     │
           │   │         `─'    │   │  ▼             │
@@ -165,7 +166,8 @@ def _rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array) -> Orde
           │   │           i, j │   │  │dy           │
           │   └────────────────┼───┘  ▼             │
           │   ◀───────────────▶◀───▶                │
-          │         (1 - dx )  │dx                  │
+          │         (1 - dx)   │dx                  │
+          │                    │                    │
           │  C                 │                 D  │
       ────┼────────────────────┼────────────────────┼────
           │                    │                    │
@@ -276,7 +278,7 @@ def _shift(a: np.array, shift_ext: tuple[int, int]) -> np.array:
     n, m = a.shape
     shift_i, shift_j = shift_ext
     if abs(shift_i) >= n or abs(shift_j) >= m:
-        # we won't load into memory your 66666666 x 6666666666 bullshit matrix
+        # won't load into memory 66666666 x 66666666 bullshit matrix
         return np.zeros_like(a)
     vpadded = np.pad(a, ((0 if shift_i < 0 else shift_i, 0 if shift_i >= 0 else -shift_i), (0, 0)))
     vpadded = vpadded[:n, :] if shift_i > 0 else vpadded[-n:, :]
