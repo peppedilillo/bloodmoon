@@ -1,14 +1,43 @@
 from bisect import bisect
+from multiprocessing.managers import Value
 from typing import Callable, Optional
 from collections import OrderedDict
 
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
-from iros.types import BinsRectangular
+from iros.types import BinsRectangular, UpscaleFactor
 
 
-def compose(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, Callable]:
+def _upscale(
+    m: np.ndarray,
+    upscale_f: UpscaleFactor,
+) -> np.ndarray:
+    """Upscale a 2D array by repeating elements along each axis.
+
+    Args:
+        m: Input 2D array
+        upscale_f: UpscaleFactor containing scaling factors for each dimension
+
+    Returns:
+        Upscaled array with dimensions multiplied by respective scaling factors
+    """
+    fx, fy = upscale_f.x, upscale_f.y
+    # VERY careful here, the next is not a typo.
+    # if i'm upscaling by (2, 1). it means i'm doubling the elements
+    # over the x direction, while keeping the same element over the y direction.
+    # this means doubling the number of columns in the mask array, while
+    # keeping the number of rows the same.
+    m = np.repeat(m, fy, axis=0)
+    m = np.repeat(m, fx, axis=1)
+    return m
+
+
+def compose(
+        a: np.ndarray,
+        b: np.ndarray,
+        strict=True,
+) -> tuple[np.ndarray, Callable]:
     """
     Composes two matrices `a` and `b` into one square embedding.
     The `b` matrix is rotated by 90 degree *clockwise*,
@@ -32,12 +61,14 @@ def compose(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, Callable]:
          │   └────┴──────────────────┴────┘  ▼
          │        ◀───────mind───────▶
          ▼
-                        WCE == `a`
-                   NCS ==  rotated(`b`)
+                        W+C+E == `a`
+                   N+C+S ==  rotated(`b`)
 
     Args:
         a (ndarray): First input matrix of shape (n,m) where n < m
         b (ndarray): Second input matrix of same shape as `a`
+        strict: if True raises an error if matrices have odd rows and even columns,
+                or viceversa.
 
     Returns:
         Tuple containing:
@@ -61,6 +92,8 @@ def compose(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, Callable]:
 
     Raises:
         AssertionError: If matrices a and b have different shapes
+        ValueError: If `strict` and matrices have odd rows and even columns (and viceversa)
+                    or if `a` and `b` have different shapes.
 
     Example:
         >>> a = np.array([[1, 2, 3, 4], [5, 6, 7, 8]])  # 2x4 matrix
@@ -72,8 +105,22 @@ def compose(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, Callable]:
         >>> f(1, 1)  # center position
         ((0, 1), (1, 1))  # maps to both a and rotated b
     """
-    assert a.shape == b.shape
+    if a.shape != b.shape:
+        raise ValueError("Input matrices must have same shape")
+
     maxd, mind = max(a.shape), min(a.shape)
+    # if matrices have odd rows and even columns composition is ambiguous
+    if maxd % 2 != mind % 2:
+        if strict:
+            raise ValueError("Input matrices must have rows and columns with same parity if `strict` is True")
+        if maxd == a.shape[1]:
+            a = a[:, :-1]
+            b = b[:, :-1]
+        else:
+            a = a[:-1, :]
+            b = b[:-1, :]
+        maxd -= 1
+
     delta = (maxd - mind) // 2
     if maxd == a.shape[1]:
         a_embedding = np.pad(a, pad_width=((delta, delta), (0, 0)))
@@ -159,11 +206,11 @@ def _rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array) -> Orde
           │   ┌────────────────┼───┐  ▲             │
           │   │                │   │  │             │
           │   │                │   │  │             │
-          │   │         .─.    │   │  │             │
-          │   │        ( c )   │   │  │(1 - dy)     │
+          │   │         .─.    │   │  │ (1 - dy)    │
+          │   │        ( c )   │   │  │             │
           │   │         `─'    │   │  ▼             │
       ────┼───┼────────────────┼───┼──▲─────────────┼────
-          │   │           i, j │   │  │dy           │
+          │   │           i, j │   │  │ dy          │
           │   └────────────────┼───┘  ▼             │
           │   ◀───────────────▶◀───▶                │
           │         (1 - dx)   │dx                  │

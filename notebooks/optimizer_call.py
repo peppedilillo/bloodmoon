@@ -38,8 +38,9 @@ def main():
     print(f"Computing first sky image.")
     # sdl = fetch_simulation("/home/deppep/Documents/wfm_sims/id10") # faint crowded
     # sdl = fetch_simulation("/home/deppep/Documents/wfm_sims/id12") # single 4.15
-    sdl = fetch_simulation("../../simulations/id00")  # double strong
-    wfm = fetch_camera(_path_test_mask, (5, 3))
+    # sdl = fetch_simulation("../../simulations/id00")  # double strong
+    sdl = fetch_simulation("../../simulations/20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb")
+    wfm = fetch_camera(_path_test_mask, (5, 1))
 
     reconstructed = True
     if reconstructed:

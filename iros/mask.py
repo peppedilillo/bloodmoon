@@ -10,7 +10,7 @@ from scipy.signal import correlate, convolve
 from scipy.stats import binned_statistic_2d
 
 from .coords import to_angles
-from .images import _shift, _interp, argmax, _erosion, _rbilinear_relative
+from .images import _shift, _interp, argmax, _erosion, _rbilinear_relative, _upscale
 from .io import MaskDataLoader
 from .types import BinsRectangular, UpscaleFactor
 
@@ -31,30 +31,6 @@ def _bin(
         Bin edges array.
     """
     return np.linspace(start, stop, int((stop - start) / step) + 1)
-
-
-def _upscale(
-    m: np.ndarray,
-    upscale_f: UpscaleFactor,
-) -> np.ndarray:
-    """Upscale a 2D array by repeating elements along each axis.
-
-    Args:
-        m: Input 2D array
-        upscale_f: UpscaleFactor containing scaling factors for each dimension
-
-    Returns:
-        Upscaled array with dimensions multiplied by respective scaling factors
-    """
-    fx, fy = upscale_f.x, upscale_f.y
-    # VERY careful here, the next is not a typo.
-    # if i'm upscaling by (2, 1). it means i'm doubling the elements
-    # over the x direction, while keeping the same element over the y direction.
-    # this means doubling the number of columns in the mask array, while
-    # keeping the number of rows the same.
-    m = np.repeat(m, fy, axis=0)
-    m = np.repeat(m, fx, axis=1)
-    return m
 
 
 def _fold(
