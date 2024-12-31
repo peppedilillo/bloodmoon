@@ -230,7 +230,7 @@ def fetch_camera(
 
     Args:
         mask_filepath: a str or a path object pointing to the mask filepath
-        upscale_f: the upscaling factor in x and y coordinates
+        upscale_f: the upscaling factor over the x and y axis
 
     Returns: a CodedMaskCamera object.
 
