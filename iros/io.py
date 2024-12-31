@@ -48,6 +48,10 @@ class SimulationDataLoader:
 
     root: Path
 
+    @property
+    def camkeys(self) -> list[str]:
+        return ["cam1a", "cam1b"]
+
     @cached_property
     def simulation_files(self):
         """

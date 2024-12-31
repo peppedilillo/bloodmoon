@@ -370,8 +370,14 @@ def optimize(
         x0=np.array((shift_start_x, shift_start_y, coarse_flux)),
         method="L-BFGS-B",
         bounds=[
-            (shift_start_x - camera.mdl["slit_deltax"] / 2, shift_start_x + camera.mdl["slit_deltax"] / 2),
-            (shift_start_y - camera.mdl["slit_deltay"] / 2, shift_start_y + camera.mdl["slit_deltay"] / 2),
+            (
+                max(shift_start_x - camera.mdl["slit_deltax"] / 2, camera.bins_sky.x[0]),
+                min(shift_start_x + camera.mdl["slit_deltax"] / 2, camera.bins_sky.x[-1]),
+            ),
+            (
+                max(shift_start_y - camera.mdl["slit_deltay"] / 2, camera.bins_sky.y[0]),
+                min(shift_start_y + camera.mdl["slit_deltay"] / 2, camera.bins_sky.y[-1]),
+            ),
             (0.95 * coarse_flux, 1.05 * coarse_flux),
         ],
         options={

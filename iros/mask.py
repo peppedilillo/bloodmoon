@@ -1,7 +1,7 @@
 from bisect import bisect_left
 from bisect import bisect_right
 from dataclasses import dataclass
-from functools import cached_property
+from functools import cached_property, cache
 from pathlib import Path
 
 from astropy.io.fits.fitsrec import FITS_rec
@@ -82,7 +82,7 @@ def _bisect_interval(
             or if the input array is not monotonically increasing.
     """
     if not (start >= a[0] and stop <= a[-1]):
-        raise ValueError("The interval isn't contained in the input array")
+        raise ValueError(f"Interval ({start:+.2f}, {stop:+.2f}) out bounds input array ({a[0]:+.2f}, {a[-1]:+.2f})")
     if not np.all(np.diff(a) > 0):
         raise ValueError("The array isn't monotonically increasing")
     return bisect_right(a, start) - 1, bisect_left(a, stop)
@@ -352,6 +352,7 @@ def _detector_footprint(camera: CodedMaskCamera) -> tuple[int, int, int, int]:
     return i_min, i_max, j_min, j_max
 
 
+@cache
 def _packing_factor(camera: CodedMaskCamera) -> tuple[float, float]:
     """
     Returns the density of slits along the x and y axis.
@@ -386,10 +387,14 @@ def _chop(
     i, j = pos
     packing_x, packing_y = map(lambda x: x * 2, _packing_factor(camera))
     min_i, max_i = _bisect_interval(
-        bins.y, bins.y[i] - camera.mdl["slit_deltay"] / packing_y, bins.y[i] + camera.mdl["slit_deltay"] / packing_y
+        bins.y,
+        max(bins.y[i] - camera.mdl["slit_deltay"] / packing_y, bins.y[0]),
+        min(bins.y[i] + camera.mdl["slit_deltay"] / packing_y, bins.y[-1]),
     )
     min_j, max_j = _bisect_interval(
-        bins.x, bins.x[j] - camera.mdl["slit_deltax"] / packing_x, bins.x[j] + camera.mdl["slit_deltax"] / packing_x
+        bins.x,
+        max(bins.x[j] - camera.mdl["slit_deltax"] / packing_x, bins.x[0]),
+        min(bins.x[j] + camera.mdl["slit_deltax"] / packing_x, bins.x[-1]),
     )
     return (min_i, max_i, min_j, max_j), BinsRectangular(
         x=bins.x[min_j : max_j + 1],
