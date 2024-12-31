@@ -1,5 +1,4 @@
 from bisect import bisect
-from multiprocessing.managers import Value
 from typing import Callable, Optional
 from collections import OrderedDict
 
@@ -191,7 +190,7 @@ def argmax(composed: np.ndarray) -> tuple[int, int]:
     return int(row), int(col)
 
 
-def _rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array) -> OrderedDict[tuple, float]:
+def _rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array,) -> OrderedDict[tuple, float]:
     """
     Reverse bilinear interpolation weights for a point in a 2D grid.
     Y coordinates are supposed to grow top to bottom.
@@ -276,7 +275,7 @@ def _rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array) -> Orde
     return OrderedDict([(k, v / total) for k, v in weights.items()])
 
 
-def _interp(tile: np.array, bins: BinsRectangular, interp_f):
+def _interp(tile: np.array, bins: BinsRectangular, interp_f: UpscaleFactor,):
     """
     Upscales a regular grid of data and interpolates with cubic splines.
 
@@ -299,7 +298,7 @@ def _interp(tile: np.array, bins: BinsRectangular, interp_f):
     return tile_interp, BinsRectangular(x=midpoints_x_fine, y=midpoints_y_fine)
 
 
-def _shift(a: np.array, shift_ext: tuple[int, int]) -> np.array:
+def _shift(a: np.array, shift_ext: tuple[int, int],) -> np.array:
     """Shifts a 2D numpy array by the specified amount in each dimension.
     This exists because the scipy.ndimage one is slow.
 
@@ -334,7 +333,7 @@ def _shift(a: np.array, shift_ext: tuple[int, int]) -> np.array:
     return hpadded
 
 
-def _erosion(arr: np.array, step: float, cut: float) -> np.array:
+def _erosion(arr: np.array, step: float, cut: float,) -> np.array:
     """
     2D matrix erosion for simulating finite thickness effect in shadow projections.
     It takes a mask array and "thins" the mask elements across the columns' direction.
@@ -408,7 +407,7 @@ def _erosion(arr: np.array, step: float, cut: float) -> np.array:
     # fmt: on
 
 
-def _rbilinear_relative(cx: float, cy: float, bins_x: np.array, bins_y: np.array) -> tuple[OrderedDict, tuple[int, int]]:
+def _rbilinear_relative(cx: float, cy: float, bins_x: np.array, bins_y: np.array,) -> tuple[OrderedDict, tuple[int, int]]:
     """To avoid computing shifts many time, we create a slightly shadowgram and index over it.
     This operation requires the results for rbilinear to be expressed relatively to the pivot."""
     results_rbilinear = _rbilinear(cx, cy, bins_x, bins_y)

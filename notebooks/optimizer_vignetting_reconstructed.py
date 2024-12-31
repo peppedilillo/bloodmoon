@@ -21,7 +21,7 @@ from iros.mask import count
 from iros.mask import decode
 from iros.mask import fetch_camera
 from iros.types import UpscaleFactor
-from iros.utils import catchtime
+from iros.utils import clock
 
 
 # def erode(
@@ -231,7 +231,7 @@ def main():
     sky = decode(wfm, detector)
 
     print(f"Starting optimization.")
-    with catchtime("optimization"):
+    with clock("optimization"):
         optimize = Optimizer(wfm)
         (shift, flux), receipt = optimize(sky)
     print(f"Ended optimization.")

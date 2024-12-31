@@ -6,7 +6,7 @@ from iros.images import argmax
 from iros.io import fetch_simulation
 from iros.assets import _path_test_mask
 
-from iros.utils import catchtime
+from iros.utils import clock
 
 
 def plotsky(sky, points=tuple(), title="", vmax=None):
@@ -52,7 +52,7 @@ def main():
 
     sky = decode(wfm, detector)
     print("Starting optimization.")
-    with catchtime("optimization"):
+    with clock("optimization"):
         shift, flux = optimize(wfm, sky, argmax(sky), vignetting=vignetting, psfy=psfy, verbose=True)
         print(shift, flux)
     print(f"Ended optimization with values (x={shift[0]:.2f}, y={shift[1]:.2f}), f={flux:.2f}.")

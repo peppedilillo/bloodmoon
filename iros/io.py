@@ -7,7 +7,7 @@ from astropy.io.fits.fitsrec import FITS_rec
 from astropy.io.fits.header import Header
 
 
-def _get_simulation_fits_data(filedict: dict, kind: str, headers: bool = False) -> dict:
+def _get_simulation_fits_data(filedict: dict, kind: str, headers: bool = False,) -> dict:
     """
     Load data or headers from FITS simulation files for both WFM cameras.
 
