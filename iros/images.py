@@ -1,11 +1,12 @@
 from bisect import bisect
-from typing import Callable, Optional
 from collections import OrderedDict
+from typing import Callable, Optional
 
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
-from iros.types import BinsRectangular, UpscaleFactor
+from iros.types import BinsRectangular
+from iros.types import UpscaleFactor
 
 
 def _upscale(
@@ -33,9 +34,9 @@ def _upscale(
 
 
 def compose(
-        a: np.ndarray,
-        b: np.ndarray,
-        strict=True,
+    a: np.ndarray,
+    b: np.ndarray,
+    strict=True,
 ) -> tuple[np.ndarray, Callable]:
     """
     Composes two matrices `a` and `b` into one square embedding.
@@ -190,7 +191,12 @@ def argmax(composed: np.ndarray) -> tuple[int, int]:
     return int(row), int(col)
 
 
-def _rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array,) -> OrderedDict[tuple, float]:
+def _rbilinear(
+    cx: float,
+    cy: float,
+    bins_x: np.array,
+    bins_y: np.array,
+) -> OrderedDict[tuple, float]:
     """
     Reverse bilinear interpolation weights for a point in a 2D grid.
     Y coordinates are supposed to grow top to bottom.
@@ -246,7 +252,11 @@ def _rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array,) -> Ord
 
     i, j = (bisect(bins_y, cy) - 1), bisect(bins_x, cx) - 1
     if i == 0 or j == 0 or i == len(bins_y) - 2 or j == len(bins_x) - 2:
-        return OrderedDict([((i, j), 1.0),])
+        return OrderedDict(
+            [
+                ((i, j), 1.0),
+            ]
+        )
 
     mx, my = (bins_x[j] + bins_x[j + 1]) / 2, (bins_y[i] + bins_y[i + 1]) / 2
     deltax, deltay = cx - mx, cy - my
@@ -265,17 +275,23 @@ def _rbilinear(cx: float, cy: float, bins_x: np.array, bins_y: np.array,) -> Ord
 
     xstep, ystep = bins_x[1] - bins_x[0], bins_y[1] - bins_y[0]
     deltax, deltay = map(abs, (deltax, deltay))
-    weights = OrderedDict([
-        (a, (ystep - deltay) * (xstep - deltax)),
-        (b, (ystep - deltay) * deltax),
-        (c, (xstep - deltax) * deltay),
-        (d, deltay * deltax),
-    ])
+    weights = OrderedDict(
+        [
+            (a, (ystep - deltay) * (xstep - deltax)),
+            (b, (ystep - deltay) * deltax),
+            (c, (xstep - deltax) * deltay),
+            (d, deltay * deltax),
+        ]
+    )
     total = sum(weights.values())
     return OrderedDict([(k, v / total) for k, v in weights.items()])
 
 
-def _interp(tile: np.array, bins: BinsRectangular, interp_f: UpscaleFactor,):
+def _interp(
+    tile: np.array,
+    bins: BinsRectangular,
+    interp_f: UpscaleFactor,
+):
     """
     Upscales a regular grid of data and interpolates with cubic splines.
 
@@ -298,7 +314,10 @@ def _interp(tile: np.array, bins: BinsRectangular, interp_f: UpscaleFactor,):
     return tile_interp, BinsRectangular(x=midpoints_x_fine, y=midpoints_y_fine)
 
 
-def _shift(a: np.array, shift_ext: tuple[int, int],) -> np.array:
+def _shift(
+    a: np.array,
+    shift_ext: tuple[int, int],
+) -> np.array:
     """Shifts a 2D numpy array by the specified amount in each dimension.
     This exists because the scipy.ndimage one is slow.
 
@@ -333,7 +352,11 @@ def _shift(a: np.array, shift_ext: tuple[int, int],) -> np.array:
     return hpadded
 
 
-def _erosion(arr: np.array, step: float, cut: float,) -> np.array:
+def _erosion(
+    arr: np.array,
+    step: float,
+    cut: float,
+) -> np.array:
     """
     2D matrix erosion for simulating finite thickness effect in shadow projections.
     It takes a mask array and "thins" the mask elements across the columns' direction.
@@ -407,13 +430,18 @@ def _erosion(arr: np.array, step: float, cut: float,) -> np.array:
     # fmt: on
 
 
-def _rbilinear_relative(cx: float, cy: float, bins_x: np.array, bins_y: np.array,) -> tuple[OrderedDict, tuple[int, int]]:
+def _rbilinear_relative(
+    cx: float,
+    cy: float,
+    bins_x: np.array,
+    bins_y: np.array,
+) -> tuple[OrderedDict, tuple[int, int]]:
     """To avoid computing shifts many time, we create a slightly shadowgram and index over it.
     This operation requires the results for rbilinear to be expressed relatively to the pivot."""
     results_rbilinear = _rbilinear(cx, cy, bins_x, bins_y)
     ((pivot_i, pivot_j), _), *__ = results_rbilinear.items()
     # noinspection PyTypeChecker
-    return OrderedDict([
-        ((k_i - pivot_i, k_j - pivot_j), w)
-        for (k_i, k_j), w in results_rbilinear.items()
-    ]), (pivot_i, pivot_j)
+    return OrderedDict([((k_i - pivot_i, k_j - pivot_j), w) for (k_i, k_j), w in results_rbilinear.items()]), (
+        pivot_i,
+        pivot_j,
+    )

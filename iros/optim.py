@@ -1,22 +1,25 @@
-from functools import lru_cache
 from bisect import bisect
+from functools import lru_cache
 from typing import Callable
 
 import numpy as np
-from scipy.signal import convolve
 from scipy.optimize import minimize
+from scipy.signal import convolve
 
-from .mask import CodedMaskCamera, _detector_footprint, decode, _chop, _interpmax, _convolution_kernel_psfy, \
-    model_shadowgram, apply_vignetting
+from .images import _rbilinear_relative
+from .images import _shift
+from .mask import _chop
+from .mask import _convolution_kernel_psfy
+from .mask import _detector_footprint
+from .mask import _interpmax
+from .mask import apply_vignetting
+from .mask import CodedMaskCamera
+from .mask import decode
+from .mask import model_shadowgram
 from .types import UpscaleFactor
-from .images import _shift, _rbilinear_relative
 
 
-def shift2pos(
-        camera: CodedMaskCamera,
-        shift_x: float,
-        shift_y: float
-) -> tuple[int, int]:
+def shift2pos(camera: CodedMaskCamera, shift_x: float, shift_y: float) -> tuple[int, int]:
     """
     Convert continuous sky-shift coordinates to nearest discrete pixel indices.
 
@@ -116,6 +119,7 @@ def _init_model_coarse(
         sg = model_shadowgram(camera, shift_x, shift_y, 1, vignetting=vignetting, psfy=psfy)
         cache_set((shift_x, shift_y), decode(camera, sg))
         return cache_get() * flux
+
     return f, cache_clear
 
 
@@ -160,17 +164,25 @@ def _init_model_fine(
         cache.clear()
 
     def process_mask(shift_x, shift_y):
-        mask_maybe_vignetted = apply_vignetting(
-            camera,
-            camera.mask,
-            shift_x,
-            shift_y,
-        ) if vignetting else camera.mask
-        mask_maybe_vignetted_maybe_psfy = convolve(
-            mask_maybe_vignetted,
-            _convolution_kernel_psfy_cached(camera),
-            mode="same",
-        ) if psfy else mask_maybe_vignetted
+        mask_maybe_vignetted = (
+            apply_vignetting(
+                camera,
+                camera.mask,
+                shift_x,
+                shift_y,
+            )
+            if vignetting
+            else camera.mask
+        )
+        mask_maybe_vignetted_maybe_psfy = (
+            convolve(
+                mask_maybe_vignetted,
+                _convolution_kernel_psfy_cached(camera),
+                mode="same",
+            )
+            if psfy
+            else mask_maybe_vignetted
+        )
         return mask_maybe_vignetted_maybe_psfy
 
     def normalized_component(framed_shadowgram, relative_position):
@@ -210,17 +222,20 @@ def _init_model_fine(
             # we call with pivot because calling with shifts to ensure consistent cached/vignetting combos
             mask_processed = process_mask(camera.bins_sky.x[pivot_j], camera.bins_sky.y[pivot_i])
             mask_shifted_processed = _shift(mask_processed, (r, c))
-            framed_shadowgram = mask_shifted_processed[i_min - 1:i_max + 1, j_min - 1:j_max + 1]
+            framed_shadowgram = mask_shifted_processed[i_min - 1 : i_max + 1, j_min - 1 : j_max + 1]
 
             # this makes me suffer, there should be a way to not compute decode four times..
             # TODO: is it possible to obtain the same behaviour without four decodings?
-            decoded_components = tuple(map(
-                lambda x: decode(camera, x),
-                (normalized_component(framed_shadowgram, rpos) for rpos in relative_positions)
-            ))
+            decoded_components = tuple(
+                map(
+                    lambda x: decode(camera, x),
+                    (normalized_component(framed_shadowgram, rpos) for rpos in relative_positions),
+                )
+            )
             cache_set((pivot, *relative_positions), decoded_components)
         sky_model = sum(dc * w for dc, w in zip(decoded_components, components.values()))
         return sky_model * flux
+
     return f, cache_clear
 
 
@@ -241,6 +256,7 @@ def _loss(model_f: Callable) -> Callable:
             - truth is the observed sky image
             - camera is the CodedMaskCamera instance
     """
+
     def f(args: np.array, truth: np.array, camera: CodedMaskCamera) -> float:
         """
         Compute MSE loss between model prediction and truth within a local window, roughly
@@ -267,6 +283,7 @@ def _loss(model_f: Callable) -> Callable:
         residual = truth_chopped - model_chopped
         mse = np.mean(np.square(residual))
         return mse
+
     return f
 
 
@@ -275,12 +292,12 @@ t_flux = float
 
 
 def optimize(
-        camera: CodedMaskCamera,
-        sky: np.array,
-        arg_sky: tuple[int, int],
-        vignetting: bool = True,
-        psfy: bool = True,
-        verbose: bool = False,
+    camera: CodedMaskCamera,
+    sky: np.array,
+    arg_sky: tuple[int, int],
+    vignetting: bool = True,
+    psfy: bool = True,
+    verbose: bool = False,
 ) -> tuple[t_shift, t_flux]:
     """
     Perform two-stage optimization to fit a point source model to sky image data.
@@ -335,7 +352,7 @@ def optimize(
             "maxiter": 10,
             "iprint": 1 if verbose else -1,
             "ftol": 10e-5,
-        }
+        },
     )
     # we use the best flux value as the initial value for the next step.
     coarse_flux = results.x[0]
@@ -361,7 +378,7 @@ def optimize(
             "maxiter": 10,
             "iprint": 1 if verbose else -1,
             "ftol": 10e-5,
-        }
+        },
     )
     # store the final optimized positions and flux.
     x, y, flux = results.x[:3]

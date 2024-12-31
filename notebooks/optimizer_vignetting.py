@@ -10,10 +10,13 @@ from iros.images import _rbilinear
 from iros.images import _shift
 from iros.images import argmax
 from iros.io import fetch_simulation
-from iros.mask import CodedMaskCamera, _chop, _interpmax, shadowgram
+from iros.mask import _chop
+from iros.mask import _interpmax
+from iros.mask import CodedMaskCamera
 from iros.mask import count
 from iros.mask import decode
 from iros.mask import fetch_camera
+from iros.mask import shadowgram
 from iros.types import UpscaleFactor
 
 

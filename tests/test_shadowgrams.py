@@ -4,9 +4,10 @@ import numpy as np
 
 from iros.assets import _path_test_mask
 from iros.images import _shift
-from iros.mask import CodedMaskCamera, shadowgram
+from iros.mask import CodedMaskCamera
 from iros.mask import encode
 from iros.mask import fetch_camera
+from iros.mask import shadowgram
 
 
 class TestArrayShift(unittest.TestCase):
@@ -134,4 +135,6 @@ class TestShadowgram(unittest.TestCase):
             with self.subTest(position=pos):
                 shadow = shadowgram(self.camera, pos)
                 benchmark = self.benchmark_shadows[pos]
-                np.testing.assert_almost_equal(np.sum(shadow), np.sum(benchmark), decimal=8, err_msg=f"Total counts mismatch at position {pos}")
+                np.testing.assert_almost_equal(
+                    np.sum(shadow), np.sum(benchmark), decimal=8, err_msg=f"Total counts mismatch at position {pos}"
+                )

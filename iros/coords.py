@@ -115,7 +115,11 @@ def to_sky_coordinates(
         pointing_radec_x,
     )
     # point distances from the mask center.
-    r = np.sqrt(midpoints_sky_xs * midpoints_sky_xs + midpoints_sky_ys * midpoints_sky_ys + distance_detector_mask * distance_detector_mask)
+    r = np.sqrt(
+        midpoints_sky_xs * midpoints_sky_xs
+        + midpoints_sky_ys * midpoints_sky_ys
+        + distance_detector_mask * distance_detector_mask
+    )
     # these are the versors from the mask center to the detector elements
     versors_local_ys = midpoints_sky_ys / r  # TODO: for reasons, francesco ceraudo has a minus here. double check.
     versors_local_xs = midpoints_sky_xs / r  # TODO: for reasons, francesco ceraudo has a minus here. double check.

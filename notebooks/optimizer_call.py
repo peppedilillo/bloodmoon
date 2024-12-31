@@ -1,11 +1,13 @@
 import matplotlib.pyplot as plt
-from iros.optim import optimize
-from iros.mask import fetch_camera, count, decode, model_sky
 
+from iros.assets import _path_test_mask
 from iros.images import argmax
 from iros.io import fetch_simulation
-from iros.assets import _path_test_mask
-
+from iros.mask import count
+from iros.mask import decode
+from iros.mask import fetch_camera
+from iros.mask import model_sky
+from iros.optim import optimize
 from iros.utils import clock
 
 

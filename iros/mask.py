@@ -6,13 +6,20 @@ from pathlib import Path
 
 from astropy.io.fits.fitsrec import FITS_rec
 import numpy as np
-from scipy.signal import correlate, convolve
+from scipy.signal import convolve
+from scipy.signal import correlate
 from scipy.stats import binned_statistic_2d
 
 from .coords import to_angles
-from .images import _shift, _interp, argmax, _erosion, _rbilinear_relative, _upscale
+from .images import _erosion
+from .images import _interp
+from .images import _rbilinear_relative
+from .images import _shift
+from .images import _upscale
+from .images import argmax
 from .io import MaskDataLoader
-from .types import BinsRectangular, UpscaleFactor
+from .types import BinsRectangular
+from .types import UpscaleFactor
 
 
 def _bin(
@@ -49,7 +56,11 @@ def _fold(
     return binned_statistic_2d(ml["X"], ml["Y"], ml["VAL"], statistic="max", bins=[mask_bins.x, mask_bins.y])[0].T
 
 
-def _bisect_interval(a: np.array, start: float, stop: float,) -> tuple[int, int]:
+def _bisect_interval(
+    a: np.array,
+    start: float,
+    stop: float,
+) -> tuple[int, int]:
     """
     Given a monotonically increasing array of floats and a float interval (start, stop)
     in it, returns the indices of the smallest sub array containing the interval.
@@ -89,6 +100,8 @@ i swear
 　 　 │　　|　|　|
 　／￣|　　 |　|　|
 　| (￣ヽ＿_ヽ_)__) """
+
+
 @dataclass(frozen=True)
 class CodedMaskCamera:
     """Dataclass containing a coded mask camera system.
@@ -241,7 +254,10 @@ def fetch_camera(
     return CodedMaskCamera(mdl, UpscaleFactor(*upscale_f))
 
 
-def encode(camera: CodedMaskCamera, sky: np.ndarray,) -> np.array:
+def encode(
+    camera: CodedMaskCamera,
+    sky: np.ndarray,
+) -> np.array:
     """Generate detector shadowgram from sky image through coded mask.
 
     Args:
@@ -255,7 +271,10 @@ def encode(camera: CodedMaskCamera, sky: np.ndarray,) -> np.array:
     return unnormalized_shadowgram
 
 
-def variance(camera: CodedMaskCamera, detector: np.array,) -> np.array:
+def variance(
+    camera: CodedMaskCamera,
+    detector: np.array,
+) -> np.array:
     """Reconstruct balanced sky variance from detector counts using cross-correlation.
 
     Args:
@@ -268,11 +287,16 @@ def variance(camera: CodedMaskCamera, detector: np.array,) -> np.array:
     cc = correlate(camera.decoder, detector, mode="full")
     var = correlate(np.square(camera.decoder), detector, mode="full")
     sum_det, sum_bulk = map(np.sum, (detector, camera.bulk))
-    var_bal = var + np.square(camera.balancing) * sum_det / np.square(sum_bulk) ** 2 - 2 * cc * camera.balancing / sum_bulk
+    var_bal = (
+        var + np.square(camera.balancing) * sum_det / np.square(sum_bulk) ** 2 - 2 * cc * camera.balancing / sum_bulk
+    )
     return var_bal
 
 
-def decode(camera: CodedMaskCamera, detector: np.array,) -> np.array:
+def decode(
+    camera: CodedMaskCamera,
+    detector: np.array,
+) -> np.array:
     """Reconstruct balanced sky image from detector counts using cross-correlation.
 
     Args:
@@ -301,7 +325,10 @@ def psf(camera: CodedMaskCamera) -> np.array:
     return correlate(camera.mask, camera.decoder, mode="same")
 
 
-def count(camera: CodedMaskCamera, data: np.array,) -> np.array:
+def count(
+    camera: CodedMaskCamera,
+    data: np.array,
+) -> np.array:
     """Create 2D histogram of detector counts from event data.
 
     Args:
@@ -341,7 +368,10 @@ def _packing_factor(camera: CodedMaskCamera) -> tuple[float, float]:
     return float(pack_x), float(pack_y)
 
 
-def _chop(camera: CodedMaskCamera, pos: tuple[int, int],) -> tuple[tuple, BinsRectangular]:
+def _chop(
+    camera: CodedMaskCamera,
+    pos: tuple[int, int],
+) -> tuple[tuple, BinsRectangular]:
     """
     Returns a slice of sky centered around `pos` and sized slightly larger than slit size.
 
@@ -355,15 +385,24 @@ def _chop(camera: CodedMaskCamera, pos: tuple[int, int],) -> tuple[tuple, BinsRe
     bins = camera.bins_sky
     i, j = pos
     packing_x, packing_y = map(lambda x: x * 2, _packing_factor(camera))
-    min_i, max_i = _bisect_interval(bins.y, bins.y[i] - camera.mdl["slit_deltay"] / packing_y, bins.y[i] + camera.mdl["slit_deltay"] / packing_y)
-    min_j, max_j = _bisect_interval(bins.x, bins.x[j] - camera.mdl["slit_deltax"] / packing_x, bins.x[j] + camera.mdl["slit_deltax"] / packing_x)
+    min_i, max_i = _bisect_interval(
+        bins.y, bins.y[i] - camera.mdl["slit_deltay"] / packing_y, bins.y[i] + camera.mdl["slit_deltay"] / packing_y
+    )
+    min_j, max_j = _bisect_interval(
+        bins.x, bins.x[j] - camera.mdl["slit_deltax"] / packing_x, bins.x[j] + camera.mdl["slit_deltax"] / packing_x
+    )
     return (min_i, max_i, min_j, max_j), BinsRectangular(
         x=bins.x[min_j : max_j + 1],
         y=bins.y[min_i : max_i + 1],
     )
 
 
-def _interpmax(camera: CodedMaskCamera, pos, sky, interp_f: UpscaleFactor,) -> tuple[float, float]:
+def _interpmax(
+    camera: CodedMaskCamera,
+    pos,
+    sky,
+    interp_f: UpscaleFactor,
+) -> tuple[float, float]:
     """
     Interpolates and maximizes data around pos.
 
@@ -394,7 +433,13 @@ _PSFY_WFM_PARAMS = {
 }
 
 
-def _modsech(x: np.array, norm: float, center: float, alpha: float, beta: float,) -> np.array:
+def _modsech(
+    x: np.array,
+    norm: float,
+    center: float,
+    alpha: float,
+    beta: float,
+) -> np.array:
     """
     PSF fitting function template.
 
@@ -445,7 +490,12 @@ def _convolution_kernel_psfy(camera: CodedMaskCamera) -> np.array:
     return kernel
 
 
-def apply_vignetting(camera: CodedMaskCamera, shadowgram: np.array, shift_x: float, shift_y: float,) -> np.array:
+def apply_vignetting(
+    camera: CodedMaskCamera,
+    shadowgram: np.array,
+    shift_x: float,
+    shift_y: float,
+) -> np.array:
     """
     Apply vignetting effects to a shadowgram based on source position.
     Vignetting occurs when mask thickness causes partial shadowing at off-axis angles.
@@ -481,12 +531,12 @@ def apply_vignetting(camera: CodedMaskCamera, shadowgram: np.array, shift_x: flo
 
 
 def model_shadowgram(
-        camera: CodedMaskCamera,
-        shift_x: float,
-        shift_y: float,
-        flux: float,
-        vignetting: bool = True,
-        psfy: bool = True,
+    camera: CodedMaskCamera,
+    shift_x: float,
+    shift_y: float,
+    flux: float,
+    vignetting: bool = True,
+    psfy: bool = True,
 ) -> np.array:
     """
     Generate a shadowgram for a point source.
@@ -526,22 +576,22 @@ def model_shadowgram(
     r, c = (n // 2 - pivot_i), (m // 2 - pivot_j)
     mask_shifted_processed = _shift(_mask, (r, c))
 
-    framed_shadowgram = mask_shifted_processed[i_min - 1:i_max + 1, j_min - 1:j_max + 1]
-    model = sum(
-        framed_shadowgram[RCMAP[pos_i], RCMAP[pos_j]] * weight
-        for (pos_i, pos_j), weight in components.items()
-    ) * camera.bulk
+    framed_shadowgram = mask_shifted_processed[i_min - 1 : i_max + 1, j_min - 1 : j_max + 1]
+    model = (
+        sum(framed_shadowgram[RCMAP[pos_i], RCMAP[pos_j]] * weight for (pos_i, pos_j), weight in components.items())
+        * camera.bulk
+    )
     model /= np.sum(model)
     return model * flux
 
 
 def model_sky(
-        camera: CodedMaskCamera,
-        shift_x: float,
-        shift_y: float,
-        flux: float,
-        vignetting: bool = True,
-        psfy: bool = True,
+    camera: CodedMaskCamera,
+    shift_x: float,
+    shift_y: float,
+    flux: float,
+    vignetting: bool = True,
+    psfy: bool = True,
 ) -> np.array:
     """
     Generate a model of the reconstructed sky image for a point source.
@@ -568,6 +618,3 @@ def model_sky(
         - For optimization, consider using the dedicated, cached function of `optim.py`
     """
     return decode(camera, model_shadowgram(camera, shift_x, shift_y, flux, vignetting, psfy))
-
-
-

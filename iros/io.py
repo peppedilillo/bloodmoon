@@ -7,7 +7,11 @@ from astropy.io.fits.fitsrec import FITS_rec
 from astropy.io.fits.header import Header
 
 
-def _get_simulation_fits_data(filedict: dict, kind: str, headers: bool = False,) -> dict:
+def _get_simulation_fits_data(
+    filedict: dict,
+    kind: str,
+    headers: bool = False,
+) -> dict:
     """
     Load data or headers from FITS simulation files for both WFM cameras.
 
@@ -63,7 +67,10 @@ class SimulationDataLoader:
                 raise ValueError(f"A file matching the pattern {str(parent / pattern)} is expected but missing.")
             f, *extra_matches = matches
             if extra_matches:
-                raise ValueError(f"Found unexpected extra matches for glob pattern {str(parent / pattern)}." f"File with pattern {pattern} should be unique")
+                raise ValueError(
+                    f"Found unexpected extra matches for glob pattern {str(parent / pattern)}."
+                    f"File with pattern {pattern} should be unique"
+                )
             return f
 
         return {

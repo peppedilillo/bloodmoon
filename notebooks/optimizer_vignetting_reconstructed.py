@@ -9,20 +9,21 @@ from scipy.optimize import minimize
 from scipy.signal import convolve
 
 from iros.assets import _path_test_mask
+from iros.images import _erosion
 from iros.images import _rbilinear
 from iros.images import _shift
 from iros.images import argmax
-from iros.images import _erosion
 from iros.io import fetch_simulation
-from iros.mask import _bisect_interval, _chop, _interpmax
+from iros.mask import _bisect_interval
+from iros.mask import _chop
 from iros.mask import _detector_footprint
+from iros.mask import _interpmax
 from iros.mask import CodedMaskCamera
 from iros.mask import count
 from iros.mask import decode
 from iros.mask import fetch_camera
 from iros.types import UpscaleFactor
 from iros.utils import clock
-
 
 # def erode(
 #         arr: np.array,
