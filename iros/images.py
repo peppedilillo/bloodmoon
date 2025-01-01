@@ -5,8 +5,8 @@ from typing import Callable, Optional
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
-from iros.types import BinsRectangular
-from iros.types import UpscaleFactor
+from .types import BinsRectangular
+from .types import UpscaleFactor
 
 
 def _upscale(

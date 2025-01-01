@@ -6,7 +6,7 @@ import numpy as np
 from iros.assets import _path_test_mask
 from iros.images import compose
 from iros.images import _upscale
-from iros.io import fetch_simulation
+from iros.io import fetch_simulation, SimulationDataLoader
 from iros.mask import _chop
 from iros.mask import CodedMaskCamera
 from iros.mask import count
@@ -22,22 +22,37 @@ class Rectangle(NamedTuple):
     p2: tuple[float, float]
 
 
-def intersect(r_a: Rectangle, r_b: Rectangle) -> bool:
-    ax1, ay1 = r_a.p1
-    ax2, ay2 = r_a.p2
-    bx1, by1 = r_b.p1
-    bx2, by2 = r_b.p2
-
-    # one  is completely to the left of the other
-    if ax2 < bx1 or bx2 < ax1:
-        return False
-    # one rectangle is completely above the other
-    if ay2 < by1 or by2 < ay1:
-        return False
-    return True
+def spans(r: Rectangle, shift: tuple[float, float]):
+    shift_x, shift_y = shift
+    rx1, ry1 = r.p1
+    rx2, ry2 = r.p2
+    rx1, rx2 = sorted((rx1, rx2))
+    ry1, ry2 = sorted((ry1, ry2))
+    return rx1 <= shift_x <= rx2 and ry1 <= shift_y <= ry2
 
 
-def centered(r_a: Rectangle, r_b: Rectangle, tolerance: float = 0.25) -> bool:
+# def intersect(r_a: Rectangle, r_b: Rectangle) -> bool:
+#     ax1, ay1 = r_a.p1
+#     ax2, ay2 = r_a.p2
+#     bx1, by1 = r_b.p1
+#     bx2, by2 = r_b.p2
+#
+#     # one  is completely to the left of the other
+#     if ax2 < bx1 or bx2 < ax1:
+#         return False
+#     # one rectangle is completely above the other
+#     if ay2 < by1 or by2 < ay1:
+#         return False
+#     return True
+
+def pos2shift(camera: CodedMaskCamera, i: int, j: int):
+    return (
+        camera.bins_sky.x[j],
+        camera.bins_sky.y[i],
+    )
+
+
+def centered(r_a: Rectangle, r_b: Rectangle, tolerance: float = 0.5) -> bool:
     ax1, ay1 = r_a.p1
     ax2, ay2 = r_a.p2
     bx1, by1 = r_b.p1
@@ -59,7 +74,9 @@ def centered(r_a: Rectangle, r_b: Rectangle, tolerance: float = 0.25) -> bool:
     )
 
 
-def init_finder(camera: CodedMaskCamera):
+def init_finder(camera: CodedMaskCamera, sdl: SimulationDataLoader):
+    excluded = {c: [] for c in sdl.camkeys}
+
     def close(a: tuple[int, int], b: tuple[int, int]):
         *_, bins_a = _chop(camera, a)
         *_, bins_b = _chop(camera, b)
@@ -71,27 +88,44 @@ def init_finder(camera: CodedMaskCamera):
             (bins_b.x[0], bins_b.y[0]),
             (bins_b.x[-1], bins_b.y[-1]),
         )
-        r_b = Rectangle(
+        r_b_ = Rectangle(
             (-r_b.p2[1], r_b.p2[0]),
             (-r_b.p1[1], r_b.p1[0]),
         )
-        return centered(r_a, r_b)
+        return centered(r_a, r_b_), r_a, r_b
 
-    def match(as_, bs) -> tuple:
-        for b in bs:
-            if close(as_[-1], b):
-                return as_[-1], b
-        for a in as_:
-            if close(a, bs[-1]):
-                return a, bs[-1]
+    def match(pending: dict) -> tuple:
+        c1, c2 = sdl.camkeys
+        if not pending[c1] or not pending[c2]:
+            return tuple()
+
+        latest_a = pending[c1][-1]
+        for b in pending[c2]:
+            isclose, r_a, r_b = close(latest_a, b)
+            if isclose:
+                excluded[c1].append(r_a)
+                excluded[c2].append(r_b)
+                return latest_a, b
+
+        latest_b = pending[c2][-1]
+        for a in pending[c1]:
+            isclose, r_a, r_b = close(a, latest_b)
+            if isclose:
+                excluded[c1].append(r_a)
+                excluded[c2].append(r_b)
+                return a, latest_b
         return tuple()
 
     def find_candidates(skys) -> dict:
         pending = {c: [] for c in sdl.camkeys}
         argsorted = {c: np.argsort(skys[c], axis=None) for c in sdl.camkeys}
-        while not (matches := match(*(pending[c] for c in sdl.camkeys))):
+        while not (matches := match(pending)):
             for c in sdl.camkeys:
-                pending[c].append(np.unravel_index(argsorted[c][-1], skys[c].shape))
+                arg = np.unravel_index(argsorted[c][-1], skys[c].shape)
+                while any([spans(r, pos2shift(camera, *arg)) for r in excluded[c]]):
+                    argsorted[c] = argsorted[c][:-1]
+                    arg = np.unravel_index(argsorted[c][-1], skys[c].shape)
+                pending[c].append(arg)
                 argsorted[c] = argsorted[c][:-1]
         return {c: m for c, m in zip(sdl.camkeys, matches)} if matches else {}
     return find_candidates
@@ -126,13 +160,14 @@ def _plotsky(sky, points=tuple(), title="", vmax=None):
     #fig.colorbar(c0, ax=ax, label="Correlation", location="bottom", shrink=.25)
     ax.set_title(title)
     plt.tight_layout()
-    plt.savefig(f"pic_detected/it{COUNTER[0]}.png")
+    plt.savefig(f"pics_detected/it{COUNTER[0]}.png")
+    plt.close()
     COUNTER[0] += 1
     return fig, ax
 
 
 def plotskys(skys):
-    print("Plotting and saving sky images")
+    print("\nPlotting and saving sky images")
     sky_1a = skys["cam1a"]
     sky_1b = skys["cam1b"]
     sky_upscaled_1a = _upscale(sky_1a, UpscaleFactor(1, 8))
@@ -144,24 +179,26 @@ def plotskys(skys):
     )
     _plotsky(composed)
 
+
 if __name__ == "__main__":
     from time import time
     tic = time()
 
     print("Fetching simulation and computing initial images")
+    #sdl = fetch_simulation("../../simulations/id00")  # double strong
     sdl = fetch_simulation("../../simulations/20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb")
     wfm = fetch_camera(_path_test_mask, (5, 1))
-    detectors_ = {c: count(wfm, sdl.reconstructed[c]) for c in sdl.camkeys}
+    detectors_ = {c: count(wfm, sdl.detected[c]) for c in sdl.camkeys}
     skys_ = {c: decode(wfm, detectors_[c]) for c in sdl.camkeys}
-    # plotskys(skys_)
+    plotskys(skys_)
 
     frms = None
-    find_candidates = init_finder(wfm)
+    find_candidates = init_finder(wfm, sdl)
     skys = {k: v.copy() for k, v in skys_.items()}
     rms = {c: rootmeansquare(skys_[c]) for c in sdl.camkeys}
     sources = {c: [] for c in sdl.camkeys}
     nit = 0
-    while nit < 20:
+    while nit < 30:
         print(f"\n\n>> Iteration number {nit}")
         if not (candidates := find_candidates(skys)):
             break
@@ -169,7 +206,7 @@ if __name__ == "__main__":
               f"\n>>  * cam1a: {tuple(map(int, candidates["cam1a"]))}"
               f"\n>>  * cam1b: {tuple(map(int, candidates["cam1b"]))}")
         for c, m in candidates.items():
-            (shift, flux) = optimize(wfm, skys[c], m, verbose=False)
+            (shift, flux) = optimize(wfm, skys[c], m, psfy=False, vignetting=False, verbose=False)
             print(f">> Ended optimization ({c}) at shift (x= {shift[0]:+.2f}, y= {shift[1]:+.2f}), flux= {flux:.2f}.")
             model = model_sky(wfm, *shift, flux)
             skys[c] -= model
@@ -181,4 +218,4 @@ if __name__ == "__main__":
 
         toc = time()
         print(f"\nElapsed time since start: {toc - tic:.2f} s")
-        # plotskys(skys)
+        plotskys(skys)

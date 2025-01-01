@@ -79,12 +79,12 @@ def _bisect_interval(
 
     Raises:
         ValueError: If the interval [start, stop] is not contained within the array bounds
-            or if the input array is not monotonically increasing.
+
+    Notes:
+        - To improve performance the function will not check for array monotonicity.
     """
     if not (start >= a[0] and stop <= a[-1]):
         raise ValueError(f"Interval ({start:+.2f}, {stop:+.2f}) out bounds input array ({a[0]:+.2f}, {a[-1]:+.2f})")
-    if not np.all(np.diff(a) > 0):
-        raise ValueError("The array isn't monotonically increasing")
     return bisect_right(a, start) - 1, bisect_left(a, stop)
 
 
