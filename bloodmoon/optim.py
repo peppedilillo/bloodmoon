@@ -57,7 +57,7 @@ def _init_model_coarse(
     """
     This is a faster version of compute_model that caches the decoded shadowgram
     pattern for repeated evaluations with the same source position but different
-    flux values. This makes it suitable for flux optimization.
+    fluence values. This makes it suitable for fluence optimization.
 
     Args:
         camera: CodedMaskCamera instance containing all geometric parameters
@@ -91,16 +91,16 @@ def _init_model_coarse(
             (None, None),
         )
 
-    def f(shift_x: float, shift_y: float, flux: float) -> np.array:
+    def f(shift_x: float, shift_y: float, fluence: float) -> np.array:
         """
         This is a faster version of compute_model that caches the decoded shadowgram
         pattern for repeated evaluations with the same source position but different
-        flux values. This makes it suitable for flux optimization.
+        fluence values. This makes it suitable for fluence optimization.
 
         Args:
             shift_x: Source position x-coordinate in sky-shift space (mm)
             shift_y: Source position y-coordinate in sky-shift space (mm)
-            flux: Source intensity/flux value
+            fluence: Source intensity/fluence value
 
         Returns:
             2D array representing the modeled sky reconstruction
@@ -108,17 +108,17 @@ def _init_model_coarse(
         Notes:
             - Uses last-value caching for the spatial pattern
             - Only recomputes pattern when position changes
-            - Scales cached pattern by flux value
+            - Scales cached pattern by fluence value
         """
         if cached((shift_x, shift_y)):
             # note we cache the normalized sky model from the normalized shadowgram.
             # hence the sky model should be adjusted by the shift.
             # print("cache hit")
-            return cache_get() * flux
+            return cache_get() * fluence
         # print("cache miss")
         sg = model_shadowgram(camera, shift_x, shift_y, 1, vignetting=vignetting, psfy=psfy)
         cache_set((shift_x, shift_y), decode(camera, sg))
-        return cache_get() * flux
+        return cache_get() * fluence
 
     return f, cache_clear
 
@@ -189,7 +189,7 @@ def _init_model_fine(
         pos_i, pos_j = relative_position
         return (s := framed_shadowgram[RCMAP[pos_i], RCMAP[pos_j]] * camera.bulk) / np.sum(s)
 
-    def f(shift_x: float, shift_y: float, flux: float) -> np.array:
+    def f(shift_x: float, shift_y: float, fluence: float) -> np.array:
         """
         This version decomposes the model into constituent components and caches them
         separately. This allows for precise interpolation between grid points while
@@ -198,7 +198,7 @@ def _init_model_fine(
         Args:
             shift_x: Source position x-coordinate in sky-shift space (mm)
             shift_y: Source position y-coordinate in sky-shift space (mm)
-            flux: Source intensity/flux value
+            fluence: Source intensity/fluence value
 
         Returns:
             2D array representing the modeled sky reconstruction
@@ -234,7 +234,7 @@ def _init_model_fine(
             )
             cache_set((pivot, *relative_positions), decoded_components)
         sky_model = sum(dc * w for dc, w in zip(decoded_components, components.values()))
-        return sky_model * flux
+        return sky_model * fluence
 
     return f, cache_clear
 
@@ -246,13 +246,13 @@ def _loss(model_f: Callable) -> Callable:
 
     Args:
         model_f: Callable that generates model predictions. Should have signature:
-            model_f(shift_x: float, shift_y: float, flux: float, camera: CodedMaskCamera) -> np.array
+            model_f(shift_x: float, shift_y: float, fluence: float, camera: CodedMaskCamera) -> np.array
 
     Returns:
         Callable that computes the loss with signature:
             f(args: np.array, truth: np.array, camera: CodedMaskCamera) -> float
         where:
-            - args is [shift_x, shift_y, flux]
+            - args is [shift_x, shift_y, fluence]
             - truth is the observed sky image
             - camera is the CodedMaskCamera instance
     """
@@ -263,7 +263,7 @@ def _loss(model_f: Callable) -> Callable:
         sized as a slit (see `chop`).
 
         Args:
-            args: Array of [shift_x, shift_y, flux] parameters to evaluate
+            args: Array of [shift_x, shift_y, fluence] parameters to evaluate
             truth: Full observed sky image to compare against
             camera: CodedMaskCamera instance containing geometry information
 
@@ -275,7 +275,7 @@ def _loss(model_f: Callable) -> Callable:
             - Model is generated using the provided model_f function
             - Only computes error within the local window to improve robustness
         """
-        shift_x, shift_y, flux = args
+        shift_x, shift_y, fluence = args
         model = model_f(*args)
         (min_i, max_i, min_j, max_j), _ = _chop(camera, shift2pos(camera, shift_x, shift_y))
         truth_chopped = truth[min_i:max_i, min_j:max_j]
@@ -287,10 +287,6 @@ def _loss(model_f: Callable) -> Callable:
     return f
 
 
-t_shift = tuple[float, float]
-t_flux = float
-
-
 def optimize(
     camera: CodedMaskCamera,
     sky: np.array,
@@ -298,13 +294,14 @@ def optimize(
     vignetting: bool = True,
     psfy: bool = True,
     verbose: bool = False,
-) -> tuple[t_shift, t_flux]:
+) -> tuple[float, float, float]:
     """
     Perform two-stage optimization to fit a point source model to sky image data.
 
     This function performs a two-stage optimization:
-    1. Coarse optimization of flux only, keeping position fixed
-    2. Fine optimization of position and flux together
+    1. Coarse optimization of fluence only, keeping position fixed
+    2. Fine, simultaneous optimization of position and fluence.
+       This step is warm-started with the flux value inferred from the coarse step.
 
     The process uses different model fidelities at each stage to balance
     speed and accuracy.
@@ -319,34 +316,32 @@ def optimize(
         verbose: If true, prints the output from the optimizer.
 
     Returns:
-        Tuple containing:
-            - ((x, y), flux): Best-fit parameters where:
+        Tuple containing the best-fit parameters `(x, y, fluence)` where:
                 - x, y are the optimized sky-shift coordinates
-                - flux is the optimized source intensity
-            - results: Full optimization results from scipy.optimize.minimize
+                - fluence is the optimized source intensity
 
     Notes:
         - Initial position is refined using interpolation
-        - Coarse stage optimizes only flux using simplified model
+        - Coarse stage optimizes only fluence using simplified model
         - Fine stage optimizes all paramete model
         - Bounds are set based on initial guess and physical constraints
     """
     # TODO: the upscaling factor should probably go into a configuration thing.
     shift_start_x, shift_start_y = _interpmax(camera, arg_sky, sky, UpscaleFactor(10, 10))
-    flux_start = sky.max()
+    fluence_start = sky.max()
 
-    # initialize the function to compute coarse, flux-dependent shadowgram model.
+    # initialize the function to compute coarse, fluence-dependent shadowgram model.
     # to reduce the number of cross-correlation the function is cached. it is our
     # responsibility to clear cache, freeing memory, after we will be done with the
-    # the coarse flux step.
+    # the coarse fluence step.
     _compute_model_coarse, _compute_model_coarse_cache_clear = _init_model_coarse(camera, vignetting, psfy)
     loss_coarse = _loss(_compute_model_coarse)
     results = minimize(
         lambda args: loss_coarse((shift_start_x, shift_start_y, args[0]), sky, camera),
-        x0=np.array((flux_start,)),
+        x0=np.array((fluence_start,)),
         method="L-BFGS-B",
         bounds=[
-            (0.75 * flux_start, 1.5 * flux_start),
+            (0.75 * fluence_start, 1.5 * fluence_start),
         ],
         options={
             "maxiter": 10,
@@ -354,12 +349,12 @@ def optimize(
             "ftol": 10e-5,
         },
     )
-    # we use the best flux value as the initial value for the next step.
-    coarse_flux = results.x[0]
+    # we use the best fluence value as the initial value for the next step.
+    coarse_fluence = results.x[0]
     # releases model cache memory.
     _compute_model_coarse_cache_clear()
 
-    # initialize the function to fine coarse, flux and position dependent shadowgram model.
+    # initialize the function to fine coarse, fluence and position dependent shadowgram model.
     # this is slower to compute and requires more memory. again it leverages caches to reduce
     # the number of cross-correlation computations, and it is our responsibility to free
     # memory after we will be done.
@@ -367,7 +362,7 @@ def optimize(
     loss_fine = _loss(_compute_model_fine)
     results = minimize(
         lambda args: loss_fine((args[0], args[1], args[2]), sky, camera),
-        x0=np.array((shift_start_x, shift_start_y, coarse_flux)),
+        x0=np.array((shift_start_x, shift_start_y, coarse_fluence)),
         method="L-BFGS-B",
         bounds=[
             (
@@ -378,7 +373,7 @@ def optimize(
                 max(shift_start_y - camera.mdl["slit_deltay"] / 2, camera.bins_sky.y[0]),
                 min(shift_start_y + camera.mdl["slit_deltay"] / 2, camera.bins_sky.y[-1]),
             ),
-            (0.95 * coarse_flux, 1.05 * coarse_flux),
+            (0.95 * coarse_fluence, 1.05 * coarse_fluence),
         ],
         options={
             "maxiter": 10,
@@ -386,9 +381,9 @@ def optimize(
             "ftol": 10e-5,
         },
     )
-    # store the final optimized positions and flux.
-    x, y, flux = results.x[:3]
+    # store the final optimized positions and fluence.
+    x, y, fluence = results.x[:3]
 
     # releases model cache memory.
     _compute_model_fine_cache_clear()
-    return (x, y), flux
+    return x, y, fluence

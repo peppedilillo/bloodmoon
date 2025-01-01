@@ -173,7 +173,7 @@ class SimulationDataLoader:
         return _get_simulation_fits_data(self.simulation_files, "sources", headers=True)
 
 
-def fetch_simulation(data_root: str | Path):
+def simulation(data_root: str | Path):
     """
     Checks data and intializes MaskDataLoader.
 

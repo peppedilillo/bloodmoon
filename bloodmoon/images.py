@@ -9,27 +9,35 @@ from .types import BinsRectangular
 from .types import UpscaleFactor
 
 
-def _upscale(
+def upscale(
     m: np.ndarray,
-    upscale_f: UpscaleFactor,
+    upscale_x: int = 1,
+    upscale_y: int = 1,
 ) -> np.ndarray:
     """Upscale a 2D array by repeating elements along each axis.
 
     Args:
         m: Input 2D array
-        upscale_f: UpscaleFactor containing scaling factors for each dimension
+        upscale_x: upscaling factor over the x direction
+        upscale_y: upscaling factor over the y direction
 
     Returns:
         Upscaled array with dimensions multiplied by respective scaling factors
+
+    Raises:
+        ValueError: for invalid upscale factors (everything but positive integers).
     """
-    fx, fy = upscale_f.x, upscale_f.y
+    if not ((isinstance(upscale_x, int) and upscale_x > 0) and
+            (isinstance(upscale_y, int) and upscale_y > 0)):
+        raise ValueError("Upscale factors must be positive integers.")
+
     # VERY careful here, the next is not a typo.
     # if i'm upscaling by (2, 1). it means i'm doubling the elements
     # over the x direction, while keeping the same element over the y direction.
     # this means doubling the number of columns in the mask array, while
     # keeping the number of rows the same.
-    m = np.repeat(m, fy, axis=0)
-    m = np.repeat(m, fx, axis=1)
+    m = np.repeat(m, upscale_y, axis=0)
+    m = np.repeat(m, upscale_x, axis=1)
     return m
 
 

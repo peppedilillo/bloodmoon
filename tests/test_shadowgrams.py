@@ -2,12 +2,7 @@ import unittest
 
 import numpy as np
 
-from bloodmoon.assets import _path_test_mask
 from bloodmoon.images import _shift
-from bloodmoon.mask import CodedMaskCamera
-from bloodmoon.mask import encode
-from bloodmoon.mask import fetch_camera
-from bloodmoon.mask import model_shadowgram
 
 
 class TestArrayShift(unittest.TestCase):

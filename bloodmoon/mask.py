@@ -16,7 +16,7 @@ from .images import _erosion
 from .images import _interp
 from .images import _rbilinear_relative
 from .images import _shift
-from .images import _upscale
+from .images import upscale
 from .images import argmax
 from .io import MaskDataLoader
 from .types import BinsRectangular
@@ -120,6 +120,11 @@ class CodedMaskCamera:
     mdl: MaskDataLoader
     upscale_f: UpscaleFactor
 
+    @property
+    def parameters(self) -> dict:
+        """Returns a dictionary of mask parameters useful for image reconstruction."""
+        return self.mdl.parameters
+
     def _bins_mask(
         self,
         upscale_f: UpscaleFactor,
@@ -175,12 +180,12 @@ class CodedMaskCamera:
     @cached_property
     def mask(self) -> np.array:
         """2D array representing the coded mask pattern."""
-        return _upscale(_fold(self.mdl.mask, self._bins_mask(UpscaleFactor(1, 1))).astype(int), self.upscale_f)
+        return upscale(_fold(self.mdl.mask, self._bins_mask(UpscaleFactor(1, 1))).astype(int), *self.upscale_f)
 
     @cached_property
     def decoder(self) -> np.array:
         """2D array representing the mask pattern used for decoding."""
-        return _upscale(_fold(self.mdl.decoder, self._bins_mask(UpscaleFactor(1, 1))), self.upscale_f)
+        return upscale(_fold(self.mdl.decoder, self._bins_mask(UpscaleFactor(1, 1))), *self.upscale_f)
 
     @cached_property
     def bulk(self) -> np.array:
@@ -190,7 +195,7 @@ class CodedMaskCamera:
         bins = self._bins_mask(self.upscale_f)
         xmin, xmax = _bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
         ymin, ymax = _bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
-        return _upscale(framed_bulk, self.upscale_f)[ymin:ymax, xmin:xmax]
+        return upscale(framed_bulk, *self.upscale_f)[ymin:ymax, xmin:xmax]
 
     @cached_property
     def balancing(self) -> np.array:
@@ -222,21 +227,25 @@ class CodedMaskCamera:
         return n + o - 1, m + p - 1
 
 
-def fetch_camera(
+def camera(
     mask_filepath: str | Path,
-    upscale_f: tuple[int, int] = (1, 1),
+    upscale_x: int = 1,
+    upscale_y: int = 1,
 ) -> CodedMaskCamera:
     """
     An interface to CodedMaskCamera.
 
     Args:
         mask_filepath: a str or a path object pointing to the mask filepath
-        upscale_f: the upscaling factor over the x and y axis
+        upscale_x: upscaling factor over the x direction
+        upscale_y: upscaling factor over the y direction
 
-    Returns: a CodedMaskCamera object.
+    Returns:
+        a CodedMaskCamera object.
 
+    Raises:
+        ValueError: for invalid upscale factors.
     """
-    # guarantee that the bisect operation just below are performed on well suited arrays.
     mdl = MaskDataLoader(mask_filepath)
 
     if not (
@@ -249,10 +258,11 @@ def fetch_camera(
     ):
         raise ValueError("Detector plane is larger than mask.")
 
-    if not (upscale_f[0] > 0 and upscale_f[1] > 0):
+    if not ((isinstance(upscale_x, int) and upscale_x > 0) and
+            (isinstance(upscale_y, int) and upscale_y > 0)):
         raise ValueError("Upscale factors must be positive integers.")
 
-    return CodedMaskCamera(mdl, UpscaleFactor(*upscale_f))
+    return CodedMaskCamera(mdl, UpscaleFactor(x=upscale_x, y=upscale_y))
 
 
 def encode(
@@ -341,7 +351,7 @@ def count(
     """
     bins = camera.bins_detector
     counts, *_ = np.histogram2d(data["Y"], data["X"], bins=[bins.y, bins.x])
-    return counts
+    return counts, bins
 
 
 def _detector_footprint(camera: CodedMaskCamera) -> tuple[int, int, int, int]:
@@ -540,12 +550,12 @@ def model_shadowgram(
     camera: CodedMaskCamera,
     shift_x: float,
     shift_y: float,
-    flux: float,
+    fluence: float,
     vignetting: bool = True,
     psfy: bool = True,
 ) -> np.array:
     """
-    Generate a shadowgram for a point source.
+    Generates a shadowgram for a point source.
 
     The model may feature:
     - Mask pattern projection
@@ -556,7 +566,7 @@ def model_shadowgram(
     Args:
         shift_x: Source position x-coordinate in sky-shift space (mm)
         shift_y: Source position y-coordinate in sky-shift space (mm)
-        flux: Source intensity/flux value
+        fluence: Source intensity/fluence value
         camera: CodedMaskCamera instance containing all geometric parameters
         vignetting: simulates vignetting effects
         psfy: simulates detector reconstruction effects
@@ -565,7 +575,7 @@ def model_shadowgram(
         2D array representing the modeled detector image from the source
 
     Notes:
-        - Results are normalized to flux, e.g. the sum of the result equals `flux`.
+        - Results are normalized to fluence, e.g. the sum of the result equals `fluence`.
     """
     # relative component map
     RCMAP = {
@@ -588,14 +598,14 @@ def model_shadowgram(
         * camera.bulk
     )
     model /= np.sum(model)
-    return model * flux
+    return model * fluence
 
 
 def model_sky(
     camera: CodedMaskCamera,
     shift_x: float,
     shift_y: float,
-    flux: float,
+    fluence: float,
     vignetting: bool = True,
     psfy: bool = True,
 ) -> np.array:
@@ -611,7 +621,7 @@ def model_sky(
     Args:
         shift_x: Source position x-coordinate in sky-shift space (mm)
         shift_y: Source position y-coordinate in sky-shift space (mm)
-        flux: Source intensity/flux value
+        fluence: Source intensity/fluence value
         camera: CodedMaskCamera instance containing all geometric parameters
         vignetting: simulates vignetting effects
         psfy: simulates detector reconstruction effects
@@ -623,4 +633,4 @@ def model_sky(
     Notes:
         - For optimization, consider using the dedicated, cached function of `optim.py`
     """
-    return decode(camera, model_shadowgram(camera, shift_x, shift_y, flux, vignetting, psfy))
+    return decode(camera, model_shadowgram(camera, shift_x, shift_y, fluence, vignetting, psfy))

@@ -5,14 +5,14 @@ import numpy as np
 from bloodmoon.assets import _path_test_mask
 from bloodmoon.mask import decode
 from bloodmoon.mask import encode
-from bloodmoon.mask import fetch_camera
+from bloodmoon.mask import camera
 from bloodmoon.mask import psf
 from bloodmoon.mask import variance
 
 
 class TestWFM(unittest.TestCase):
     def setUp(self):
-        self.wfm = fetch_camera(_path_test_mask, (2, 1))
+        self.wfm = camera(_path_test_mask, upscale_x=2, upscale_y=1)
 
     def test_shape_bulk(self):
         self.assertEqual(self.wfm.bulk.shape, self.wfm.detector_shape)
