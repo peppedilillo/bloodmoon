@@ -3,11 +3,11 @@ import unittest
 import numpy as np
 
 from bloodmoon.assets import _path_test_mask
-from bloodmoon.mask import variance
 from bloodmoon.mask import decode
 from bloodmoon.mask import encode
 from bloodmoon.mask import fetch_camera
 from bloodmoon.mask import psf
+from bloodmoon.mask import variance
 
 
 class TestWFM(unittest.TestCase):

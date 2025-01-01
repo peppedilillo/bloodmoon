@@ -1,7 +1,8 @@
 from bisect import bisect_left
 from bisect import bisect_right
 from dataclasses import dataclass
-from functools import cached_property, cache
+from functools import cache
+from functools import cached_property
 from pathlib import Path
 
 from astropy.io.fits.fitsrec import FITS_rec
