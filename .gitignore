@@ -165,4 +165,5 @@ cython_debug/
 
 **/.DS_Store
 notebooks/
+demo/wfm_mask.fits
 repomix-output.txt
