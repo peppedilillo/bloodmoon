@@ -163,5 +163,6 @@ cython_debug/
 .idea/
 ## GITHUB DEFAULT .gitignore ENDS
 
+**/.DS_Store
 notebooks/
 repomix-output.txt

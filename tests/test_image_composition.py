@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from iros.images import compose
+from bloodmoon.images import compose
 
 
 class TestCompose(unittest.TestCase):

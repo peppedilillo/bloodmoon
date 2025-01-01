@@ -3,7 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "iros"
+name = "bloodmoon"
+description = "A library for dealing with data and simulations from the WFM coded mask instrument."
+keywords = ["astrophysics", "coded masks"]
 version = "0.0.1"
 authors = [
     { name="Giuseppe Dilillo", email="peppedilillo@gmail.com" },
@@ -11,13 +13,12 @@ authors = [
 requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.11",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 dependencies = [
     "numpy",
-	"pandas",
     "matplotlib",
     "astropy",
     "scipy",

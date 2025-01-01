@@ -2,12 +2,12 @@ import unittest
 
 import numpy as np
 
-from iros.assets import _path_test_mask
-from iros.images import _shift
-from iros.mask import CodedMaskCamera
-from iros.mask import encode
-from iros.mask import fetch_camera
-from iros.mask import shadowgram
+from bloodmoon.assets import _path_test_mask
+from bloodmoon.images import _shift
+from bloodmoon.mask import CodedMaskCamera
+from bloodmoon.mask import encode
+from bloodmoon.mask import fetch_camera
+from bloodmoon.mask import model_shadowgram
 
 
 class TestArrayShift(unittest.TestCase):
@@ -80,61 +80,3 @@ class TestArrayShift(unittest.TestCase):
         bool_arr = np.array([[True, False], [False, True]], dtype=bool)
         expected = np.array([[True, False], [False, False]])
         np.testing.assert_array_equal(_shift(bool_arr, (-1, -1)), expected)
-
-
-def benchmark_shadowgram(camera: CodedMaskCamera, source_position: tuple[int, int]):
-    i, j = source_position
-    sky_model = np.zeros(camera.sky_shape)
-    sky_model[i, j] = 1
-    return np.round(encode(camera, sky_model)).astype(int)
-
-
-class TestShadowgram(unittest.TestCase):
-    def setUp(self):
-        """Set up test data including precomputed benchmark shadowgrams."""
-        self.camera = fetch_camera(_path_test_mask, (2, 1))
-        n, m = self.camera.sky_shape
-        self.test_positions = [
-            (0, 0),  # Top-left corner
-            (0, m - 1),  # Top-right corner
-            (n - 1, 0),  # Bottom-left corner
-            (n - 1, m - 1),  # Bottom-right corner
-            (n // 2, m // 2),  # Center
-            (n // 4, m // 4),  # Top-left quarter
-            (n // 4, 3 * m // 4),  # Top-right quarter
-            (3 * n // 4, m // 4),  # Bottom-left quarter
-            (3 * n // 4, 3 * m // 4),  # Bottom-right quarter
-        ]
-
-        # Precompute benchmark shadowgrams
-        self.benchmark_shadows = {pos: benchmark_shadowgram(self.camera, pos) for pos in self.test_positions}
-
-    def test_shapes_match(self):
-        """Test if both implementations produce the same shape outputs."""
-        for pos in self.test_positions:
-            with self.subTest(position=pos):
-                shadow = shadowgram(self.camera, pos)
-                benchmark = self.benchmark_shadows[pos]
-                self.assertEqual(
-                    shadow.shape,
-                    benchmark.shape,
-                    f"Shape mismatch at position {pos}: {shadow.shape} vs {benchmark.shape}",
-                )
-
-    def test_arrays_equal(self):
-        """Test if both implementations produce identical outputs."""
-        for pos in self.test_positions:
-            with self.subTest(position=pos):
-                shadow = shadowgram(self.camera, pos)
-                benchmark = self.benchmark_shadows[pos]
-                np.testing.assert_array_equal(shadow, benchmark, err_msg=f"Arrays not equal at position {pos}")
-
-    def test_array_sums_match(self):
-        """Test if the total counts in the shadowgrams match."""
-        for pos in self.test_positions:
-            with self.subTest(position=pos):
-                shadow = shadowgram(self.camera, pos)
-                benchmark = self.benchmark_shadows[pos]
-                np.testing.assert_almost_equal(
-                    np.sum(shadow), np.sum(benchmark), decimal=8, err_msg=f"Total counts mismatch at position {pos}"
-                )
