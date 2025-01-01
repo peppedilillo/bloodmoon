@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bloodmoon"
-description = "A library for dealing with data and simulations from the WFM coded mask instrument."
+description = "A library for analyzing data and simulations from the WFM coded mask instrument."
 keywords = ["astrophysics", "coded masks"]
 version = "0.0.1"
 authors = [
