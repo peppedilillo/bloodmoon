@@ -18,18 +18,17 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "numpy",
-    "matplotlib",
-    "astropy",
-    "scipy",
+    "numpy~=2.2",
+    "matplotlib~=3.10",
+    "astropy~=7.0",
+    "scipy~=1.14",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pyinstrument",
-    "black",
-    "isort",
-    "ipython",
-    "jupyter",
+    "pyinstrument~=5.0",
+    "black~=24.10",
+    "isort~=5.13",
+    "ipython~=8.31",
 ]
 
