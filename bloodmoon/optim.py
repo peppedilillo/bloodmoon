@@ -303,8 +303,7 @@ def optimize(
     2. Fine, simultaneous optimization of position and fluence.
        This step is warm-started with the flux value inferred from the coarse step.
 
-    The process uses different model fidelities at each stage to balance
-    speed and accuracy.
+    The process uses different model at each stage to balance speed and accuracy.
 
     Args:
         camera: CodedMaskCamera instance containing detector and mask parameters
@@ -322,8 +321,6 @@ def optimize(
 
     Notes:
         - Initial position is refined using interpolation
-        - Coarse stage optimizes only fluence using simplified model
-        - Fine stage optimizes all paramete model
         - Bounds are set based on initial guess and physical constraints
     """
     # TODO: the upscaling factor should probably go into a configuration thing.
