@@ -1,3 +1,7 @@
+"""
+General utility functions for the bloodmoon package.
+"""
+
 from contextlib import contextmanager
 from time import perf_counter
 from typing import Callable

@@ -1,3 +1,13 @@
+"""
+Data loading and handling for WFM mask and simulation data.
+
+This module provides dataclasses and utilities for:
+- Loading mask parameters and patterns from FITS files
+- Managing simulation data including photon events and pointing information
+- Accessing detector, reconstruction, and source information
+- Parsing configuration data from FITS headers
+"""
+
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path

@@ -1,3 +1,16 @@
+"""
+Image processing and manipulation utilities for coded mask data analysis.
+
+This module provides functions for:
+- Image composition and decomposition
+- Upscaling and interpolation
+- Pattern shifting and erosion
+- Bilinear interpolation
+- Image statistics and peak finding
+
+The functions handle both detector shadowgrams and reconstructed sky images.
+"""
+
 from bisect import bisect
 from collections import OrderedDict
 from typing import Callable, Optional

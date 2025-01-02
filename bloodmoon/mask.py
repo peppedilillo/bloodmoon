@@ -1,3 +1,16 @@
+"""
+Core functionality for coded mask imaging analysis.
+
+This module implements the primary algorithms for:
+- Shadowgram generation and encoding
+- Image reconstruction and decoding
+- Point spread function calculation
+- Source detection and counting
+- Vignetting and detector effects modeling
+
+These components form the foundation of the WFM data analysis pipeline.
+"""
+
 from bisect import bisect_left
 from bisect import bisect_right
 from dataclasses import dataclass

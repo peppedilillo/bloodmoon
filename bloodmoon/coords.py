@@ -1,3 +1,14 @@
+"""
+Coordinate transformation utilities for the WFM coded mask instrument.
+
+This module provides functions to convert between different coordinate systems:
+- Sky-shift coordinates (mm on the detector plane)
+- Angular coordinates (degrees from optical axis)
+- Equatorial coordinates (RA/Dec)
+
+The transformations account for the instrument geometry and pointing direction.
+"""
+
 import numpy as np
 
 from .types import BinsEquatorial

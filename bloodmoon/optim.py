@@ -1,3 +1,16 @@
+"""
+Optimization routines for source parameter estimation.
+
+This module provides algorithms for:
+- Source position refinement
+- Flux estimation
+- Two-stage optimization process
+- Model fitting with instrumental effects
+- Caching strategies for performance
+
+The optimization handles both spatial and intensity parameters simultaneously.
+"""
+
 from bisect import bisect
 from functools import lru_cache
 from typing import Callable
