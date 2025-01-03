@@ -5,6 +5,7 @@ Custom data types and containers for the WFM analysis pipeline.
 from typing import NamedTuple
 
 import numpy as np
+import numpy.typing as npt
 
 
 class BinsRectangular(NamedTuple):
@@ -15,8 +16,8 @@ class BinsRectangular(NamedTuple):
         y: Array of y-coordinate bin edges
     """
 
-    x: np.array
-    y: np.array
+    x: npt.NDArray
+    y: npt.NDArray
 
     def __repr__(self):
         def r(n):
@@ -41,8 +42,8 @@ class BinsEquatorial(NamedTuple):
         dec: Array of dec coordinate bin edges
     """
 
-    ra: np.array
-    dec: np.array
+    ra: npt.NDArray
+    dec: npt.NDArray
 
 
 class UpscaleFactor(NamedTuple):

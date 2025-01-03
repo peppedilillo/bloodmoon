@@ -20,6 +20,7 @@ from pathlib import Path
 
 from astropy.io.fits.fitsrec import FITS_rec
 import numpy as np
+import numpy.typing as npt
 from scipy.signal import convolve
 from scipy.signal import correlate
 from scipy.stats import binned_statistic_2d
@@ -40,7 +41,7 @@ def _bin(
     start: float,
     stop: float,
     step: float,
-) -> np.array:
+) -> npt.NDArray:
     """Returns equally spaced points between start and stop, included.
 
     Args:
@@ -57,7 +58,7 @@ def _bin(
 def _fold(
     ml: FITS_rec,
     mask_bins: BinsRectangular,
-) -> np.array:
+) -> npt.NDArray:
     """Convert mask data from FITS record to 2D binned array.
 
     Args:
@@ -71,7 +72,7 @@ def _fold(
 
 
 def _bisect_interval(
-    a: np.array,
+    a: npt.NDArray,
     start: float,
     stop: float,
 ) -> tuple[int, int]:
@@ -191,17 +192,17 @@ class CodedMaskCamera:
         return BinsRectangular(*to_angles(self.bins_sky.x, self.bins_sky.y, self.mdl["mask_detector_distance"]))
 
     @cached_property
-    def mask(self) -> np.array:
+    def mask(self) -> npt.NDArray:
         """2D array representing the coded mask pattern."""
         return upscale(_fold(self.mdl.mask, self._bins_mask(UpscaleFactor(1, 1))).astype(int), *self.upscale_f)
 
     @cached_property
-    def decoder(self) -> np.array:
+    def decoder(self) -> npt.NDArray:
         """2D array representing the mask pattern used for decoding."""
         return upscale(_fold(self.mdl.decoder, self._bins_mask(UpscaleFactor(1, 1))), *self.upscale_f)
 
     @cached_property
-    def bulk(self) -> np.array:
+    def bulk(self) -> npt.NDArray:
         """2D array representing the bulk (sensitivity) array of the mask."""
         framed_bulk = _fold(self.mdl.bulk, self._bins_mask(UpscaleFactor(1, 1)))
         framed_bulk[~np.isclose(framed_bulk, np.zeros_like(framed_bulk))] = 1
@@ -211,7 +212,7 @@ class CodedMaskCamera:
         return upscale(framed_bulk, *self.upscale_f)[ymin:ymax, xmin:xmax]
 
     @cached_property
-    def balancing(self) -> np.array:
+    def balancing(self) -> npt.NDArray:
         """2D array representing the correlation between decoder and bulk patterns."""
         return correlate(self.decoder, self.bulk, mode="full")
 
@@ -281,7 +282,7 @@ def codedmask(
 def encode(
     camera: CodedMaskCamera,
     sky: np.ndarray,
-) -> np.array:
+) -> npt.NDArray:
     """Generate detector shadowgram from sky image through coded mask.
 
     Args:
@@ -297,8 +298,8 @@ def encode(
 
 def variance(
     camera: CodedMaskCamera,
-    detector: np.array,
-) -> np.array:
+    detector: npt.NDArray,
+) -> npt.NDArray:
     """Reconstruct balanced sky variance from detector counts using cross-correlation.
 
     Args:
@@ -319,8 +320,8 @@ def variance(
 
 def decode(
     camera: CodedMaskCamera,
-    detector: np.array,
-) -> np.array:
+    detector: npt.NDArray,
+) -> npt.NDArray:
     """Reconstruct balanced sky image from detector counts using cross-correlation.
 
     Args:
@@ -337,7 +338,7 @@ def decode(
     return cc_bal
 
 
-def psf(camera: CodedMaskCamera) -> np.array:
+def psf(camera: CodedMaskCamera) -> npt.NDArray:
     """Calculate Point Spread Function (PSF) of the coded mask system.
 
     Args:
@@ -351,8 +352,8 @@ def psf(camera: CodedMaskCamera) -> np.array:
 
 def count(
     camera: CodedMaskCamera,
-    data: np.array,
-) -> np.array:
+    data: npt.NDArray,
+) -> npt.NDArray:
     """Create 2D histogram of detector counts from event data.
 
     Args:
@@ -492,12 +493,12 @@ _PSFY_WFM_PARAMS = {
 
 
 def _modsech(
-    x: np.array,
+    x: npt.NDArray,
     norm: float,
     center: float,
     alpha: float,
     beta: float,
-) -> np.array:
+) -> npt.NDArray:
     """
     PSF fitting function template.
 
@@ -514,7 +515,7 @@ def _modsech(
     return norm / np.cosh(np.abs((x - center) / alpha) ** beta)
 
 
-def psfy_wfm(x: np.array) -> np.array:
+def psfy_wfm(x: npt.NDArray) -> npt.NDArray:
     """
     PSF function in y direction as fitted from WFM simulations.
 
@@ -527,7 +528,7 @@ def psfy_wfm(x: np.array) -> np.array:
     return _modsech(x, norm=1, **_PSFY_WFM_PARAMS)
 
 
-def _convolution_kernel_psfy(camera: CodedMaskCamera) -> np.array:
+def _convolution_kernel_psfy(camera: CodedMaskCamera) -> npt.NDArray:
     """
     Returns PSF convolution kernel.
     At present, it ignores the `x` direction, since PSF characteristic lenght is much shorter
@@ -550,10 +551,10 @@ def _convolution_kernel_psfy(camera: CodedMaskCamera) -> np.array:
 
 def apply_vignetting(
     camera: CodedMaskCamera,
-    shadowgram: np.array,
+    shadowgram: npt.NDArray,
     shift_x: float,
     shift_y: float,
-) -> np.array:
+) -> npt.NDArray:
     """
     Apply vignetting effects to a shadowgram based on source position.
     Vignetting occurs when mask thickness causes partial shadowing at off-axis angles.
@@ -595,7 +596,7 @@ def model_shadowgram(
     fluence: float,
     vignetting: bool = True,
     psfy: bool = True,
-) -> np.array:
+) -> npt.NDArray:
     """
     Generates a shadowgram for a point source.
 
@@ -650,7 +651,7 @@ def model_sky(
     fluence: float,
     vignetting: bool = True,
     psfy: bool = True,
-) -> np.array:
+) -> npt.NDArray:
     """
     Generate a model of the reconstructed sky image for a point source.
 

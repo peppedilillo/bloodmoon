@@ -14,11 +14,13 @@ import numpy as np
 from .types import BinsEquatorial
 from .types import BinsRectangular
 
+import numpy.typing as npt
+
 
 def _rotation_matrices(
     pointing_radec_z: tuple[float, float],
     pointing_radec_x: tuple[float, float],
-) -> tuple[np.array, np.array]:
+) -> tuple[npt.NDArray, npt.NDArray]:
     """
     This function computes two 3x3 rotation matrices that transform coordinates between
     the Earth equatorial reference frame (RA/Dec) and the camera's local reference frame.
@@ -79,8 +81,8 @@ def _rotation_matrices(
 
 
 def to_sky_coordinates(
-    midpoints_sky_xs: np.array,
-    midpoints_sky_ys: np.array,
+    midpoints_sky_xs: npt.NDArray,
+    midpoints_sky_ys: npt.NDArray,
     pointing_radec_z: tuple[float, float],
     pointing_radec_x: tuple[float, float],
     distance_detector_mask: float,
@@ -154,8 +156,8 @@ def to_sky_coordinates(
 
 
 def to_angles(
-    midpoints_xs: np.array,
-    midpoints_ys: np.array,
+    midpoints_xs: npt.NDArray,
+    midpoints_ys: npt.NDArray,
     distance_detector_mask: float,
 ) -> BinsRectangular:
     """

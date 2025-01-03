@@ -16,6 +16,7 @@ from functools import lru_cache
 from typing import Callable
 
 import numpy as np
+import numpy.typing as npt
 from scipy.optimize import minimize
 from scipy.signal import convolve
 
@@ -104,7 +105,7 @@ def _init_model_coarse(
             (None, None),
         )
 
-    def f(shift_x: float, shift_y: float, fluence: float) -> np.array:
+    def f(shift_x: float, shift_y: float, fluence: float) -> npt.NDArray:
         """
         This is a faster version of compute_model that caches the decoded shadowgram
         pattern for repeated evaluations with the same source position but different
@@ -202,7 +203,7 @@ def _init_model_fine(
         pos_i, pos_j = relative_position
         return (s := framed_shadowgram[RCMAP[pos_i], RCMAP[pos_j]] * camera.bulk) / np.sum(s)
 
-    def f(shift_x: float, shift_y: float, fluence: float) -> np.array:
+    def f(shift_x: float, shift_y: float, fluence: float) -> npt.NDArray:
         """
         This version decomposes the model into constituent components and caches them
         separately. This allows for precise interpolation between grid points while
@@ -270,7 +271,7 @@ def _loss(model_f: Callable) -> Callable:
             - camera is the CodedMaskCamera instance
     """
 
-    def f(args: np.array, truth: np.array, camera: CodedMaskCamera) -> float:
+    def f(args: npt.NDArray, truth: npt.NDArray, camera: CodedMaskCamera) -> float:
         """
         Compute MSE loss between model prediction and truth within a local window, roughly
         sized as a slit (see `chop`).
@@ -302,7 +303,7 @@ def _loss(model_f: Callable) -> Callable:
 
 def optimize(
     camera: CodedMaskCamera,
-    sky: np.array,
+    sky: npt.NDArray,
     arg_sky: tuple[int, int],
     vignetting: bool = True,
     psfy: bool = True,

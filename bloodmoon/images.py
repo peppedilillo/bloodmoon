@@ -16,6 +16,7 @@ from collections import OrderedDict
 from typing import Callable, Optional
 
 import numpy as np
+import numpy.typing as npt
 from scipy.interpolate import RegularGridInterpolator
 
 from .types import BinsRectangular
@@ -23,7 +24,7 @@ from .types import UpscaleFactor
 
 
 def upscale(
-    m: np.ndarray,
+    m: npt.NDArray,
     upscale_x: int = 1,
     upscale_y: int = 1,
 ) -> np.ndarray:
@@ -55,8 +56,8 @@ def upscale(
 
 
 def compose(
-    a: np.ndarray,
-    b: np.ndarray,
+    a: npt.NDArray,
+    b: npt.NDArray,
     strict=True,
 ) -> tuple[np.ndarray, Callable]:
     """
@@ -199,7 +200,7 @@ def compose(
     return composed, f
 
 
-def argmax(composed: np.ndarray) -> tuple[int, int]:
+def argmax(composed: npt.NDArray) -> tuple[int, int]:
     """Find indices of maximum value in array.
 
     Args:
@@ -215,8 +216,8 @@ def argmax(composed: np.ndarray) -> tuple[int, int]:
 def _rbilinear(
     cx: float,
     cy: float,
-    bins_x: np.array,
-    bins_y: np.array,
+    bins_x: npt.NDArray,
+    bins_y: npt.NDArray,
 ) -> OrderedDict[tuple, float]:
     """
     Reverse bilinear interpolation weights for a point in a 2D grid.
@@ -309,7 +310,7 @@ def _rbilinear(
 
 
 def _interp(
-    tile: np.array,
+    tile: npt.NDArray,
     bins: BinsRectangular,
     interp_f: UpscaleFactor,
 ):
@@ -336,9 +337,9 @@ def _interp(
 
 
 def _shift(
-    a: np.array,
+    a: npt.NDArray,
     shift_ext: tuple[int, int],
-) -> np.array:
+) -> npt.NDArray:
     """Shifts a 2D numpy array by the specified amount in each dimension.
     This exists because the scipy.ndimage one is slow.
 
@@ -374,10 +375,10 @@ def _shift(
 
 
 def _erosion(
-    arr: np.array,
+    arr: npt.NDArray,
     step: float,
     cut: float,
-) -> np.array:
+) -> npt.NDArray:
     """
     2D matrix erosion for simulating finite thickness effect in shadow projections.
     It takes a mask array and "thins" the mask elements across the columns' direction.
@@ -454,8 +455,8 @@ def _erosion(
 def _rbilinear_relative(
     cx: float,
     cy: float,
-    bins_x: np.array,
-    bins_y: np.array,
+    bins_x: npt.NDArray,
+    bins_y: npt.NDArray,
 ) -> tuple[OrderedDict, tuple[int, int]]:
     """To avoid computing shifts many time, we create a slightly shadowgram and index over it.
     This operation requires the results for rbilinear to be expressed relatively to the pivot."""
@@ -468,7 +469,7 @@ def _rbilinear_relative(
     )
 
 
-def _unframe(a: np.array, value: float = 0.) -> np.array:
+def _unframe(a: npt.NDArray, value: float = 0.) -> npt.NDArray:
     """Removes outer frames of a 2D array until a non-zero frame is found.
 
     A frame is considered empty if all values in its border are zeros. The function
