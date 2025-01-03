@@ -30,8 +30,8 @@ from .images import _erosion
 from .images import _interp
 from .images import _rbilinear_relative
 from .images import _shift
-from .images import upscale
 from .images import argmax
+from .images import upscale
 from .io import MaskDataLoader
 from .types import BinsRectangular
 from .types import UpscaleFactor
@@ -272,8 +272,7 @@ def codedmask(
     ):
         raise ValueError("Detector plane is larger than mask.")
 
-    if not ((isinstance(upscale_x, int) and upscale_x > 0) and
-            (isinstance(upscale_y, int) and upscale_y > 0)):
+    if not ((isinstance(upscale_x, int) and upscale_x > 0) and (isinstance(upscale_y, int) and upscale_y > 0)):
         raise ValueError("Upscale factors must be positive integers.")
 
     return CodedMaskCamera(mdl, UpscaleFactor(x=upscale_x, y=upscale_y))

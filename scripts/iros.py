@@ -1,14 +1,21 @@
 from typing import Callable
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
-from bloodmoon import simulation, codedmask, count, decode, optimize, model_sky, chop
-from bloodmoon.images import upscale, argmax, compose
+from bloodmoon import chop
+from bloodmoon import codedmask
+from bloodmoon import count
+from bloodmoon import decode
+from bloodmoon import model_sky
+from bloodmoon import optimize
+from bloodmoon import simulation
 from bloodmoon.assets import _path_test_mask
+from bloodmoon.images import argmax
+from bloodmoon.images import compose
+from bloodmoon.images import upscale
 from bloodmoon.io import SimulationDataLoader
 from bloodmoon.mask import CodedMaskCamera
-
 
 PLOT_COUNTER = [0]
 
@@ -17,7 +24,7 @@ def _plotsky(sky, points=tuple(), title="", vmax=None, dpi=300):
     fig, ax = plt.subplots(1, 1, figsize=(12, 12), dpi=dpi)
     ax.imshow(sky, vmax=np.quantile(sky, 0.9999) if vmax is None else vmax, vmin=0)
     for p in points:
-        ax.scatter(p[1], p[0], s=80, facecolors='none', edgecolors='white')
+        ax.scatter(p[1], p[0], s=80, facecolors="none", edgecolors="white")
     ax.set_title(title)
     plt.tight_layout()
     plt.savefig(f"../notebooks/pics_detected/it{PLOT_COUNTER[0]}.png")
@@ -68,6 +75,7 @@ def source_smaller_residual_maximum(camera):
 
     def f(residual1: np.array, residual2: np.array) -> bool:
         return f1(residual1) or f2(residual1)
+
     return f
 
 
@@ -104,6 +112,7 @@ def prms_smaller(than: float) -> Callable:
             assert prms2_ is None
             return False
         return abs(prms1_) < than and abs(prms2_) < than
+
     return f
 
 
@@ -114,11 +123,13 @@ def main(
     stop_when: Callable = lambda: False,
 ):
 
-    def close(a: tuple[int, int], b: tuple[int, int],) -> bool:
+    def close(
+        a: tuple[int, int],
+        b: tuple[int, int],
+    ) -> bool:
         ax, ay = camera.bins_sky.x[a[1]], camera.bins_sky.y[a[0]]
         bx, by = -camera.bins_sky.y[b[0]], camera.bins_sky.x[b[1]]  # applying rotation
-        return (abs(ax - bx) < camera.mdl["slit_deltax"] and
-                abs(ay - by) < camera.mdl["slit_deltay"])
+        return abs(ax - bx) < camera.mdl["slit_deltax"] and abs(ay - by) < camera.mdl["slit_deltay"]
 
     def match(pending: dict) -> tuple:
         c1, c2 = sdl.camkeys
@@ -184,6 +195,6 @@ if __name__ == "__main__":
     main(
         wfm,
         sdl,
-        stop_when=prms_smaller(than=.1),  # lambda x,y: c1(x, y) or c2(x, y),
+        stop_when=prms_smaller(than=0.1),  # lambda x,y: c1(x, y) or c2(x, y),
         max_iterations=20,
     )

@@ -23,14 +23,8 @@ class BinsRectangular(NamedTuple):
         def r(n):
             return round(n.item(), 3)
 
-        reprx = (
-            f"np.array([{r(self.x[0])}, {r(self.x[1])}, .., {r(self.x[-1])}])"
-            if len(self.x) > 3 else f"{self.x}"
-        )
-        repry = (
-            f"np.array([{r(self.y[0])}, {r(self.y[1])}, .., {r(self.y[-1])}])"
-            if len(self.y) > 3 else f"{self.y}"
-        )
+        reprx = f"np.array([{r(self.x[0])}, {r(self.x[1])}, .., {r(self.x[-1])}])" if len(self.x) > 3 else f"{self.x}"
+        repry = f"np.array([{r(self.y[0])}, {r(self.y[1])}, .., {r(self.y[-1])}])" if len(self.y) > 3 else f"{self.y}"
         return f"BinsRectangular(x={reprx}, y={repry})"
 
 

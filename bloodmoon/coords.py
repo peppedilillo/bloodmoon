@@ -10,11 +10,10 @@ The transformations account for the instrument geometry and pointing direction.
 """
 
 import numpy as np
+import numpy.typing as npt
 
 from .types import BinsEquatorial
 from .types import BinsRectangular
-
-import numpy.typing as npt
 
 
 def _rotation_matrices(

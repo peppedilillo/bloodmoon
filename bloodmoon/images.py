@@ -41,8 +41,7 @@ def upscale(
     Raises:
         ValueError: for invalid upscale factors (everything but positive integers).
     """
-    if not ((isinstance(upscale_x, int) and upscale_x > 0) and
-            (isinstance(upscale_y, int) and upscale_y > 0)):
+    if not ((isinstance(upscale_x, int) and upscale_x > 0) and (isinstance(upscale_y, int) and upscale_y > 0)):
         raise ValueError("Upscale factors must be positive integers.")
 
     # VERY careful here, the next is not a typo.
@@ -469,7 +468,7 @@ def _rbilinear_relative(
     )
 
 
-def _unframe(a: npt.NDArray, value: float = 0.) -> npt.NDArray:
+def _unframe(a: npt.NDArray, value: float = 0.0) -> npt.NDArray:
     """Removes outer frames of a 2D array until a non-zero frame is found.
 
     A frame is considered empty if all values in its border are zeros. The function
@@ -510,10 +509,10 @@ def _unframe(a: npt.NDArray, value: float = 0.) -> npt.NDArray:
         bottom_row = slice(n - i - 1, n - i), slice(i, m - i)
         left_column = slice(i, n - i), slice(i, i + 1)
         if not (
-                np.any(np.isclose(a[*upper_row], 0.)) or
-                np.any(np.isclose(a[*right_column], 0.)) or
-                np.any(np.isclose(a[*bottom_row], 0.)) or
-                np.any(np.isclose(a[*left_column], 0.))
+            np.any(np.isclose(a[*upper_row], 0.0))
+            or np.any(np.isclose(a[*right_column], 0.0))
+            or np.any(np.isclose(a[*bottom_row], 0.0))
+            or np.any(np.isclose(a[*left_column], 0.0))
         ):
             break
         out[*upper_row] = value

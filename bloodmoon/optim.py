@@ -22,11 +22,11 @@ from scipy.signal import convolve
 
 from .images import _rbilinear_relative
 from .images import _shift
-from .mask import chop
 from .mask import _convolution_kernel_psfy
 from .mask import _detector_footprint
 from .mask import _interpmax
 from .mask import apply_vignetting
+from .mask import chop
 from .mask import CodedMaskCamera
 from .mask import decode
 from .mask import model_shadowgram
