@@ -466,3 +466,57 @@ def _rbilinear_relative(
         pivot_i,
         pivot_j,
     )
+
+
+def _unframe(a: np.array, value: float = 0.) -> np.array:
+    """Removes outer frames of a 2D array until a non-zero frame is found.
+
+    A frame is considered empty if all values in its border are zeros. The function
+    works from outside in, replacing each empty frame with the specified value until
+    it finds a frame that contains non-zero values.
+
+    Args:
+        a (np.array): Input 2D array to process.
+        value (float, optional): Value to replace the empty frames with. Defaults to `0.`.
+
+    Returns:
+        np.array: A copy of the input array with empty frames replaced.
+
+    Raises:
+        ValueError: If the input is not a two dimensional array.
+
+    Examples:
+        >>> arr = np.array([
+        ...     [0, 1, 0, 0],
+        ...     [0, 1, 2, 0],
+        ...     [0, 3, 4, 0],
+        ...     [0, 0, 0, 1]
+        ... ])
+        >>> unframe(arr)
+        array([[0, 0, 0, 0],
+               [0, 1, 2, 0],
+               [0, 3, 4, 0],
+               [0, 0, 0, 0]])
+    """
+    if a.ndim != 2:
+        raise ValueError("Input is not a two dimensional array.")
+    n, m = a.shape
+    maxd, mind = sorted((n, m))
+    out = a.copy()
+    for i in range(mind // 2):
+        upper_row = slice(i, i + 1), slice(i, m - i)
+        right_column = slice(i, n - i), slice(m - i - 1, m - i)
+        bottom_row = slice(n - i - 1, n - i), slice(i, m - i)
+        left_column = slice(i, n - i), slice(i, i + 1)
+        if not (
+                np.any(np.isclose(a[*upper_row], 0.)) or
+                np.any(np.isclose(a[*right_column], 0.)) or
+                np.any(np.isclose(a[*bottom_row], 0.)) or
+                np.any(np.isclose(a[*left_column], 0.))
+        ):
+            break
+        out[*upper_row] = value
+        out[*right_column] = value
+        out[*bottom_row] = value
+        out[*left_column] = value
+    return out

@@ -41,6 +41,7 @@ components or refer to the module docstrings.
 """
 
 from .mask import camera
+from .mask import chop
 from .mask import count
 from .mask import decode
 from .mask import model_sky

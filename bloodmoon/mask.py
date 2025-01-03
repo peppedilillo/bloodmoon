@@ -393,7 +393,36 @@ def _packing_factor(camera: CodedMaskCamera) -> tuple[float, float]:
     return float(pack_x), float(pack_y)
 
 
-def _chop(
+def strip(
+    camera: CodedMaskCamera,
+    pos: tuple[int, int],
+) -> tuple[tuple, BinsRectangular]:
+    """
+    Returns a thin slice of sky centered around `pos`.
+    The strip has height 1 in the y direction and length equal to slit length in x direction.
+
+    Args:
+        camera: a CodedMaskCameraObject.
+        pos: the (row, col) indeces of the slice center.
+
+    Returns:
+        A tuple of the slice value (length n) and its bins (length n + 1).
+    """
+    bins = camera.bins_sky
+    i, j = pos
+    min_i, max_i = i, i + 1
+    min_j, max_j = _bisect_interval(
+        bins.x,
+        max(bins.x[j] - camera.mdl["slit_deltax"] / 2, bins.x[0]),
+        min(bins.x[j] + camera.mdl["slit_deltax"] / 2, bins.x[-1]),
+    )
+    return (min_i, max_i, min_j, max_j), BinsRectangular(
+        x=bins.x[min_j : max_j + 1],
+        y=bins.y[min_i : max_i + 1],
+    )
+
+
+def chop(
     camera: CodedMaskCamera,
     pos: tuple[int, int],
 ) -> tuple[tuple, BinsRectangular]:
@@ -409,16 +438,16 @@ def _chop(
     """
     bins = camera.bins_sky
     i, j = pos
-    packing_x, packing_y = map(lambda x: x * 2, _packing_factor(camera))
+    packing_x, packing_y = _packing_factor(camera)
     min_i, max_i = _bisect_interval(
         bins.y,
-        max(bins.y[i] - camera.mdl["slit_deltay"] / packing_y, bins.y[0]),
-        min(bins.y[i] + camera.mdl["slit_deltay"] / packing_y, bins.y[-1]),
+        max(bins.y[i] - camera.mdl["slit_deltay"] / (2 * packing_y), bins.y[0]),
+        min(bins.y[i] + camera.mdl["slit_deltay"] / (2 * packing_y), bins.y[-1]),
     )
     min_j, max_j = _bisect_interval(
         bins.x,
-        max(bins.x[j] - camera.mdl["slit_deltax"] / packing_x, bins.x[0]),
-        min(bins.x[j] + camera.mdl["slit_deltax"] / packing_x, bins.x[-1]),
+        max(bins.x[j] - camera.mdl["slit_deltax"] / (2 * packing_x), bins.x[0]),
+        min(bins.x[j] + camera.mdl["slit_deltax"] / (2 * packing_x), bins.x[-1]),
     )
     return (min_i, max_i, min_j, max_j), BinsRectangular(
         x=bins.x[min_j : max_j + 1],
@@ -444,7 +473,7 @@ def _interpmax(
     Returns:
         Sky-shift position of the interpolated maximum.
     """
-    (min_i, max_i, min_j, max_j), bins = _chop(camera, pos)
+    (min_i, max_i, min_j, max_j), bins = chop(camera, pos)
     tile_interp, bins_fine = _interp(sky[min_i:max_i, min_j:max_j], bins, interp_f)
     max_tile_i, max_tile_j = argmax(tile_interp)
     return tuple(map(float, (bins_fine.x[max_tile_j], bins_fine.y[max_tile_i])))

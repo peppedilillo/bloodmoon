@@ -21,7 +21,7 @@ from scipy.signal import convolve
 
 from .images import _rbilinear_relative
 from .images import _shift
-from .mask import _chop
+from .mask import chop
 from .mask import _convolution_kernel_psfy
 from .mask import _detector_footprint
 from .mask import _interpmax
@@ -290,7 +290,7 @@ def _loss(model_f: Callable) -> Callable:
         """
         shift_x, shift_y, fluence = args
         model = model_f(*args)
-        (min_i, max_i, min_j, max_j), _ = _chop(camera, shift2pos(camera, shift_x, shift_y))
+        (min_i, max_i, min_j, max_j), _ = chop(camera, shift2pos(camera, shift_x, shift_y))
         truth_chopped = truth[min_i:max_i, min_j:max_j]
         model_chopped = model[min_i:max_i, min_j:max_j]
         residual = truth_chopped - model_chopped
@@ -392,7 +392,7 @@ def optimize(
         },
     )
     # store the final optimized positions and fluence.
-    x, y, fluence = results.x[:3]
+    x, y, fluence = map(float, results.x[:3])
 
     # releases model cache memory.
     _compute_model_fine_cache_clear()
