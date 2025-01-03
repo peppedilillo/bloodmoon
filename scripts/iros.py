@@ -3,7 +3,7 @@ from typing import Callable
 import numpy as np
 import matplotlib.pyplot as plt
 
-from bloodmoon import simulation, camera, count, decode, optimize, model_sky, chop
+from bloodmoon import simulation, codedmask, count, decode, optimize, model_sky, chop
 from bloodmoon.images import upscale, argmax, compose
 from bloodmoon.assets import _path_test_mask
 from bloodmoon.io import SimulationDataLoader
@@ -177,7 +177,7 @@ def main(
 
 if __name__ == "__main__":
     sdl = simulation("../../simulations/galcenter")
-    wfm = camera(_path_test_mask, upscale_x=5, upscale_y=1)
+    wfm = codedmask(_path_test_mask, upscale_x=5, upscale_y=1)
     # c1 = prms_smaller(than=.1)
     # c2 = source_smaller_residual_maximum(wfm)
 

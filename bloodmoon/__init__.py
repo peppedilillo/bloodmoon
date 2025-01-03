@@ -7,7 +7,7 @@ features for image reconstruction, source detection, and parameter estimation.
 
 Main Components:
 ---------------
-camera : Function
+codedmask : Function
     Creates a CodedMaskCamera instance from mask FITS file
 
 simulation : Function
@@ -31,7 +31,7 @@ optimize : Function
 Example:
 --------
 >>> import bloodmoon
->>> wfm = bloodmoon.camera("wfm_mask.fits")  # Load camera
+>>> wfm = bloodmoon.codedmask("wfm_mask.fits")  # Load camera
 >>> sdl = bloodmoon.simulation("simdata/")    # Load simulation
 >>> detector, bins = bloodmoon.count(wfm, sdl.reconstructed["cam1a"])
 >>> sky = bloodmoon.decode(wfm, detector)     # Reconstruct sky image
@@ -40,7 +40,7 @@ For detailed documentation on specific functions, use help() on the individual
 components or refer to the module docstrings.
 """
 
-from .mask import camera
+from .mask import codedmask
 from .mask import chop
 from .mask import count
 from .mask import decode

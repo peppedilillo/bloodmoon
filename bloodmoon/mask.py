@@ -240,7 +240,7 @@ class CodedMaskCamera:
         return n + o - 1, m + p - 1
 
 
-def camera(
+def codedmask(
     mask_filepath: str | Path,
     upscale_x: int = 1,
     upscale_y: int = 1,
