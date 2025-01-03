@@ -27,6 +27,7 @@ from scipy.stats import binned_statistic_2d
 
 from .coords import to_angles
 from .images import _erosion
+from .images import _unframe
 from .images import _interp
 from .images import _rbilinear_relative
 from .images import _shift
@@ -315,6 +316,28 @@ def variance(
         var + np.square(camera.balancing) * sum_det / np.square(sum_bulk) ** 2 - 2 * cc * camera.balancing / sum_bulk
     )
     return var_bal
+
+
+def snratio(
+    sky: npt.NDArray,
+    var: npt.NDArray,
+) -> npt.NDArray:
+    """Calculate signal-to-noise ratio from sky signal and variance arrays.
+
+    Args:
+        sky: Array containing sky signal values.
+        var: Array containing variance values. Negative values are clipped to 0.
+
+    Returns:
+        NDArray: Signal-to-noise ratio calculated as sky/sqrt(variance).
+        
+    Notes:
+        - Variance's boundary frames with elements close to zero are replaced with infinity.
+        - Variance's minimum is clipped at 0 if any negative value are present in the array.
+    """
+    variance_clipped = np.clip(var, a_min=0., a_max=None) if np.any(var < 0) else var
+    variance_unframed = _unframe(variance_clipped, value=np.inf)
+    return sky / np.sqrt(variance_unframed)
 
 
 def decode(
