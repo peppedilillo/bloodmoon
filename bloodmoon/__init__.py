@@ -34,6 +34,9 @@ model_sky : Function
 optimize : Function
     Estimates source parameters through two-stage optimization
 
+iros : Function
+    Source subtraction by Iterative Removal of Sources method.
+
 Example:
 --------
 >>> import bloodmoon
@@ -51,9 +54,10 @@ from .mask import chop
 from .mask import codedmask
 from .mask import count
 from .mask import decode
-from .mask import variance
-from .mask import snratio
 from .mask import model_shadowgram
 from .mask import model_sky
+from .mask import snratio
 from .mask import strip
+from .mask import variance
+from .optim import iros
 from .optim import optimize

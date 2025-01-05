@@ -15,6 +15,7 @@ class CoordEquatorial(NamedTuple):
         ra: right ascension
         dec: declination
     """
+
     ra: float
     dec: float
 
@@ -27,6 +28,7 @@ class CoordHorizontal(NamedTuple):
         az: azimuth
         al: altitude
     """
+
     az: float
     al: float
 

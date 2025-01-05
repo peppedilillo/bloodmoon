@@ -13,7 +13,7 @@ The optimization handles both spatial and intensity parameters simultaneously.
 
 from bisect import bisect
 from functools import lru_cache
-from typing import Callable, Optional, Generator, Literal
+from typing import Callable, Generator, Literal, Optional
 import warnings
 
 import numpy as np
@@ -24,18 +24,19 @@ from scipy.signal import convolve
 from .images import _rbilinear_relative
 from .images import _shift
 from .io import SimulationDataLoader
-from .mask import _convolution_kernel_psfy, snratio
+from .mask import _convolution_kernel_psfy
 from .mask import _detector_footprint
 from .mask import _interpmax
 from .mask import apply_vignetting
 from .mask import chop
-from .mask import strip
-from .mask import model_sky
-from .mask import count
-from .mask import variance
 from .mask import CodedMaskCamera
+from .mask import count
 from .mask import decode
 from .mask import model_shadowgram
+from .mask import model_sky
+from .mask import snratio
+from .mask import strip
+from .mask import variance
 from .types import UpscaleFactor
 
 
@@ -407,18 +408,12 @@ def optimize(
 
 
 def iros(
-        camera: CodedMaskCamera,
-        sdl: SimulationDataLoader,
-        max_iterations: int,
-        snr_threshold: float | None = None,
-        dataset: Literal["detected", "reconstructed"] = "reconstructed",
-) -> Generator[
-    tuple[
-        dict[
-            str,
-            Optional[tuple[float, float, float]]], dict[str, npt.NDArray]
-    ],
-]:
+    camera: CodedMaskCamera,
+    sdl: SimulationDataLoader,
+    max_iterations: int,
+    snr_threshold: float | None = None,
+    dataset: Literal["detected", "reconstructed"] = "reconstructed",
+) -> Generator[tuple[dict[str, Optional[tuple[float, float, float]]], dict[str, npt.NDArray]],]:
     """Performs Iterative Removal of Sources (IROS) for dual-camera WFM observations.
 
     This function implements an iterative source detection and removal algorithm for
@@ -464,7 +459,6 @@ def iros(
 
     # Verify cameras are oriented orthogonally (90° rotation in azimuth)
     # This is required for the source position matching algorithm
-
     # fmt: off
     if not (
             np.isclose(
@@ -484,10 +478,9 @@ def iros(
     if dataset not in ["detected", "reconstructed"]:
         raise ValueError("Argument `dataset` must be either `detected` or `reconstructed`.")
 
-
     def direction_match(
-            a: tuple[int, int],
-            b: tuple[int, int],
+        a: tuple[int, int],
+        b: tuple[int, int],
     ) -> bool:
         """Determines if source positions from both cameras correspond to the same sky location.
         Compares source positions accounting for the 90° camera rotation. Positions are
@@ -497,13 +490,10 @@ def iros(
         # we apply -90deg rotation to camera b source
         bx, by = -camera.bins_sky.y[b[0]], camera.bins_sky.x[b[1]]
         min_slit = min(camera.mdl["slit_deltax"], camera.mdl["slit_deltay"])
-        return (
-                abs(ax - bx) < min_slit and
-                abs(ay - by) < min_slit
-        )
+        return abs(ax - bx) < min_slit and abs(ay - by) < min_slit
 
     def match(pending: dict) -> tuple:
-        """Cross-check the last entry in pending to match against all other pending directions """
+        """Cross-check the last entry in pending to match against all other pending directions"""
         c1, c2 = sdl.camkeys
         if not pending[c1] or not pending[c2]:
             return tuple()
@@ -528,10 +518,7 @@ def iros(
         and initializes the data structures it relies on."""
         # variance is clipped to improve numerical stability for off-axis sources,
         # which may result in very few counts.
-        snrs = {
-            c: snratio(skys[c], np.clip(vars[c], a_min=1, a_max=None))
-            for c in sdl.camkeys
-        }
+        snrs = {c: snratio(skys[c], np.clip(vars[c], a_min=1, a_max=None)) for c in sdl.camkeys}
         # we sort source directions by significance.
         # this is kind of costly because the sky arrays may be very large.
         # TODO: improve on this only sorting matrix elements over a threshold.
@@ -548,7 +535,7 @@ def iros(
             for c in sdl.camkeys:
                 for arg in batches[c]:
                     (min_i, max_i, min_j, max_j), _ = strip(camera, arg)
-                    slit = snrs[c][min_i: max_i, min_j: max_j]
+                    slit = snrs[c][min_i:max_i, min_j:max_j]
                     intensities[c].append(np.sum(slit))
             return intensities
 
@@ -634,7 +621,4 @@ def iros(
                 continue
             sources[c] = source
             skys[c] = residual
-        yield (
-            {k: v for k, v in sources.items()},
-            {k: v for k, v in skys.items()}
-        )
+        yield {k: v for k, v in sources.items()}, {k: v for k, v in skys.items()}

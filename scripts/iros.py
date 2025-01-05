@@ -1,23 +1,23 @@
 from typing import Callable
 
+from astropy.coordinates import angular_separation
 import matplotlib.pyplot as plt
 import numpy as np
-from astropy.coordinates import angular_separation
 
-from bloodmoon.mask import strip
 from bloodmoon import codedmask
 from bloodmoon import count
 from bloodmoon import decode
 from bloodmoon import model_sky
 from bloodmoon import optimize
 from bloodmoon import simulation
-from bloodmoon import variance
 from bloodmoon import snratio
+from bloodmoon import variance
 from bloodmoon.assets import _path_test_mask
 from bloodmoon.images import compose
 from bloodmoon.images import upscale
 from bloodmoon.io import SimulationDataLoader
 from bloodmoon.mask import CodedMaskCamera
+from bloodmoon.mask import strip
 
 PLOT_COUNTER = [0]
 
@@ -115,12 +115,10 @@ def main(
     lat_z_b1 = sdl.rotations["cam1b"]["z"].al
 
     if not (
-        np.isclose(angular_separation(*map(np.deg2rad, (lon_x_a1, lat_x_a1, lon_x_b1, lat_x_b1))), np.pi) and
-        np.isclose(angular_separation(*map(np.deg2rad, (lon_z_a1, lat_z_a1, lon_z_b1, lat_z_b1))), 0.)
+        np.isclose(angular_separation(*map(np.deg2rad, (lon_x_a1, lat_x_a1, lon_x_b1, lat_x_b1))), np.pi)
+        and np.isclose(angular_separation(*map(np.deg2rad, (lon_z_a1, lat_z_a1, lon_z_b1, lat_z_b1))), 0.0)
     ):
-        raise ValueError('Cameras must be rotated by 90° degrees over azimuth.')
-
-
+        raise ValueError("Cameras must be rotated by 90° degrees over azimuth.")
 
     def close(
         a: tuple[int, int],
@@ -135,13 +133,10 @@ def main(
         # we apply -90deg rotation to camera b source
         bx, by = -camera.bins_sky.y[b[0]], camera.bins_sky.x[b[1]]
         min_slit = min(camera.mdl["slit_deltax"], camera.mdl["slit_deltay"])
-        return (
-            abs(ax - bx) < min_slit and
-            abs(ay - by) < min_slit
-        )
+        return abs(ax - bx) < min_slit and abs(ay - by) < min_slit
 
     def match(pending: dict) -> tuple:
-        """Cross-check the last entry in pending to match against all other pending directions """
+        """Cross-check the last entry in pending to match against all other pending directions"""
         c1, c2 = sdl.camkeys
         if not pending[c1] or not pending[c2]:
             return tuple()
@@ -161,15 +156,12 @@ def main(
                 return a, latest_b
         return tuple()
 
-    def init_get_arg(skys: dict, batchsize: int=1000) -> Callable:
+    def init_get_arg(skys: dict, batchsize: int = 1000) -> Callable:
         """This hides a reservoir-batch mechanism for quickly selecting candidates,
         and initializes the data structures it relies on."""
         # variance is clipped to improve numerical stability for off-axis sources,
         # which may result in very few counts.
-        snrs = {
-            c: snratio(skys[c], np.clip(vars[c], a_min=1, a_max=None))
-            for c in sdl.camkeys
-        }
+        snrs = {c: snratio(skys[c], np.clip(vars[c], a_min=1, a_max=None)) for c in sdl.camkeys}
         # we sort source directions by significance.
         # this is kind of costly because the sky arrays may be very large.
         # TODO: improve on this only sorting matrix elements over a threshold.
@@ -185,7 +177,7 @@ def main(
             for c in sdl.camkeys:
                 for arg in batches[c]:
                     (min_i, max_i, min_j, max_j), _ = strip(camera, arg)
-                    slit = snrs[c][min_i: max_i, min_j: max_j]
+                    slit = snrs[c][min_i:max_i, min_j:max_j]
                     intensities[c].append(np.sum(slit))
             return intensities
 

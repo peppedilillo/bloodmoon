@@ -16,7 +16,8 @@ from astropy.io import fits
 from astropy.io.fits.fitsrec import FITS_rec
 from astropy.io.fits.header import Header
 
-from bloodmoon.types import CoordEquatorial, CoordHorizontal
+from bloodmoon.types import CoordEquatorial
+from bloodmoon.types import CoordHorizontal
 
 
 def _get_simulation_fits_data(
