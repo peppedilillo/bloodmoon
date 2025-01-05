@@ -16,6 +16,8 @@ from astropy.io import fits
 from astropy.io.fits.fitsrec import FITS_rec
 from astropy.io.fits.header import Header
 
+from bloodmoon.types import CoordEquatorial, CoordHorizontal
+
 
 def _get_simulation_fits_data(
     filedict: dict,
@@ -101,9 +103,10 @@ class SimulationDataLoader:
         }
 
     @cached_property
-    def pointings(self) -> dict[str, dict[str, tuple]]:
+    def pointings(self) -> dict[str, dict[str, CoordEquatorial]]:
         """
-        Extract camera pointing information from reconstruction file headers.
+        Extract camera axis pointing information in equatorial frame from reconstructed file headers.
+        Angles are expressed in degrees.
 
         Returns:
             Nested dictionary containing RA/Dec coordinates for both cameras'
@@ -113,12 +116,35 @@ class SimulationDataLoader:
         header_1b = fits.getheader(self.simulation_files["cam1b"]["reconstructed"], ext=0)
         return {
             "cam1a": {
-                "radec_z": (header_1a["CAMZRA"], header_1a["CAMZDEC"]),
-                "radec_x": (header_1a["CAMXRA"], header_1a["CAMXDEC"]),
+                "z": CoordEquatorial(ra=header_1a["CAMZRA"], dec=header_1a["CAMZDEC"]),
+                "x": CoordEquatorial(ra=header_1a["CAMXRA"], dec=header_1a["CAMXDEC"]),
             },
             "cam1b": {
-                "radec_z": (header_1b["CAMZRA"], header_1b["CAMZDEC"]),
-                "radec_x": (header_1b["CAMXRA"], header_1b["CAMXDEC"]),
+                "z": CoordEquatorial(ra=header_1b["CAMZRA"], dec=header_1b["CAMZDEC"]),
+                "x": CoordEquatorial(ra=header_1b["CAMXRA"], dec=header_1b["CAMXDEC"]),
+            },
+        }
+
+    @cached_property
+    def rotations(self) -> dict[str, dict[str, CoordHorizontal]]:
+        """
+        Extract camera axis directions in the instrument frame from reconstructed file header.
+        Angles expressed in degrees.
+
+        Returns:
+            Nested dictionary containing RA/Dec coordinates for both cameras'
+            z and x axes.
+        """
+        header_1a = fits.getheader(self.simulation_files["cam1a"]["reconstructed"], ext=0)
+        header_1b = fits.getheader(self.simulation_files["cam1b"]["reconstructed"], ext=0)
+        return {
+            "cam1a": {
+                "z": CoordHorizontal(az=header_1a["CAMZPH"], al=90 - header_1a["CAMZTH"]),
+                "x": CoordHorizontal(az=header_1a["CAMXPH"], al=90 - header_1a["CAMXTH"]),
+            },
+            "cam1b": {
+                "z": CoordHorizontal(az=header_1b["CAMZPH"], al=90 - header_1b["CAMZTH"]),
+                "x": CoordHorizontal(az=header_1b["CAMXPH"], al=90 - header_1b["CAMXTH"]),
             },
         }
 
@@ -322,9 +348,7 @@ def fetch_mask(filepath: str | Path) -> MaskDataLoader:
 
 
 """
-ain't all these 
-dataclasses
-too much?
+too much dataclasses
 
 ⠀⠀⠀⠀⠀⠀⣀⣠⣤⣤⣤⣤⣀⡀
 ⠀⠀⠀⣠⡶⡿⢿⣿⣛⣟⣿⡿⢿⢿⣷⣦⡀

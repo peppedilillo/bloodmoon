@@ -8,6 +8,29 @@ import numpy as np
 import numpy.typing as npt
 
 
+class CoordEquatorial(NamedTuple):
+    """Equatorial coordinates.
+
+    Args:
+        ra: right ascension
+        dec: declination
+    """
+    ra: float
+    dec: float
+
+
+class CoordHorizontal(NamedTuple):
+    """
+    Horizontal coordinates.
+
+    Args:
+        az: azimuth
+        al: altitude
+    """
+    az: float
+    al: float
+
+
 class BinsRectangular(NamedTuple):
     """Two-dimensional binning structure for rectangular coordinates.
 

@@ -433,7 +433,11 @@ def strip(
     """
     bins = camera.bins_sky
     i, j = pos
-    min_i, max_i = i, i + 1
+    min_i, max_i = _bisect_interval(
+        bins.y,
+        max(bins.y[i] - camera.mdl["slit_deltay"] / 2, bins.y[0]),
+        min(bins.y[i] + camera.mdl["slit_deltay"] / 2, bins.y[-1]),
+    )
     min_j, max_j = _bisect_interval(
         bins.x,
         max(bins.x[j] - camera.mdl["slit_deltax"] / 2, bins.x[0]),
@@ -496,7 +500,7 @@ def _interpmax(
     Returns:
         Sky-shift position of the interpolated maximum.
     """
-    (min_i, max_i, min_j, max_j), bins = chop(camera, pos)
+    (min_i, max_i, min_j, max_j), bins = strip(camera, pos)
     tile_interp, bins_fine = _interp(sky[min_i:max_i, min_j:max_j], bins, interp_f)
     max_tile_i, max_tile_j = argmax(tile_interp)
     return tuple(map(float, (bins_fine.x[max_tile_j], bins_fine.y[max_tile_i])))

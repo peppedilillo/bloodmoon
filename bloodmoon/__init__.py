@@ -55,4 +55,5 @@ from .mask import variance
 from .mask import snratio
 from .mask import model_shadowgram
 from .mask import model_sky
+from .mask import strip
 from .optim import optimize
