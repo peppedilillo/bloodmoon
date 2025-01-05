@@ -124,11 +124,11 @@ def main(
         a: tuple[int, int],
         b: tuple[int, int],
     ) -> bool:
-        """Checks that `a` and `b` indeces corresponds to similiar source direction.
-        Tolerances are determined by the size of the smallest aperture over the fine direction.
-        At present this function relies on the fact that `cam1b` is rotated by 90° from `cam1a`
-        over the azimuth plane of the instrument frame.
-        TODO: not urgent, but in a future we should make this work for arbitray camera rotations."""
+        """Checks that `a` and `b` indeces corresponds to similiar source direction with
+        tolerances are determined by the size of the smallest aperture over the fine direction."""
+        # TODO: this function relies on `cam1b` being rotated by 90° from `cam1a` over the azimuth plane
+        #  of the instrument frame. not urgent, but in a future we should make this work for arbitray
+        #  camera rotations.
         ax, ay = camera.bins_sky.x[a[1]], camera.bins_sky.y[a[0]]
         # we apply -90deg rotation to camera b source
         bx, by = -camera.bins_sky.y[b[0]], camera.bins_sky.x[b[1]]
