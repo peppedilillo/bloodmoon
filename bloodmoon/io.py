@@ -104,6 +104,17 @@ class SimulationDataLoader:
         }
 
     @cached_property
+    def mask_detector_distance(self) -> float:
+        """
+        Extract mask-detector distance from reconstructed file headers.
+
+        Returns:
+            The distance between the mask bottom and the detector top, in mm.
+        """
+        header_1a = fits.getheader(self.simulation_files["cam1a"]["reconstructed"], ext=0)
+        return float(header_1a["MDDIST"])
+
+    @cached_property
     def pointings(self) -> dict[str, dict[str, CoordEquatorial]]:
         """
         Extract camera axis pointing information in equatorial frame from reconstructed file headers.
@@ -267,7 +278,6 @@ class MaskDataLoader:
                 "detector_maxx": h["PLNXMAX"],
                 "detector_miny": h["PLNYMIN"],
                 "detector_maxy": h["PLNYMAX"],
-                "mask_detector_distance": h["MDDIST"],
             }.items()
         }
 

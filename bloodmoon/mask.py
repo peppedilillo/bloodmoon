@@ -11,7 +11,7 @@ This module implements the primary algorithms for:
 These components form the foundation of the WFM data analysis pipeline.
 """
 
-from bisect import bisect_left
+from bisect import bisect_left, bisect
 from bisect import bisect_right
 from dataclasses import dataclass
 from functools import cache
@@ -25,7 +25,7 @@ from scipy.signal import convolve
 from scipy.signal import correlate
 from scipy.stats import binned_statistic_2d
 
-from .coords import to_angles
+from .coords import _to_angles
 from .images import _erosion
 from .images import _interp
 from .images import _rbilinear_relative
@@ -190,7 +190,7 @@ class CodedMaskCamera:
     @cached_property
     def bins_angle_sky(self) -> BinsRectangular:
         """Returns bins for the sky-shift domain"""
-        return BinsRectangular(*to_angles(self.bins_sky.x, self.bins_sky.y, self.mdl["mask_detector_distance"]))
+        return BinsRectangular(*_to_angles(self.bins_sky.x, self.bins_sky.y, self.mdl["mask_detector_distance"]))
 
     @cached_property
     def mask(self) -> npt.NDArray:
@@ -703,3 +703,21 @@ def model_sky(
         - For optimization, consider using the dedicated, cached function of `optim.py`
     """
     return decode(camera, model_shadowgram(camera, shift_x, shift_y, fluence, vignetting, psfy))
+
+
+def shift2pos(camera: CodedMaskCamera, shift_x: float, shift_y: float) -> tuple[int, int]:
+    """
+    Convert continuous sky-shift coordinates to nearest discrete pixel indices.
+
+    Args:
+        camera: CodedMaskCamera instance containing binning information
+        shift_x: x-coordinate in sky-shift space (mm)
+        shift_y: y-coordinate in sky-shift space (mm)
+
+    Returns:
+        Tuple of (row, column) indices in the discrete sky image grid
+
+    Notes:
+        TODO: Needs boundary checks for shifts outside valid range
+    """
+    return bisect(camera.bins_sky.y, shift_y) - 1, bisect(camera.bins_sky.x, shift_x) - 1

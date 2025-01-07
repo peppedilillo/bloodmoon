@@ -11,9 +11,8 @@ This module provides algorithms for:
 The optimization handles both spatial and intensity parameters simultaneously.
 """
 
-from bisect import bisect
 from functools import lru_cache
-from typing import Callable, Generator, Literal, Optional
+from typing import Callable, Iterable, Literal
 import warnings
 
 import numpy as np
@@ -24,7 +23,7 @@ from scipy.signal import convolve
 from .images import _rbilinear_relative
 from .images import _shift
 from .io import SimulationDataLoader
-from .mask import _convolution_kernel_psfy
+from .mask import _convolution_kernel_psfy, shift2pos
 from .mask import _detector_footprint
 from .mask import _interpmax
 from .mask import apply_vignetting
@@ -38,24 +37,6 @@ from .mask import snratio
 from .mask import strip
 from .mask import variance
 from .types import UpscaleFactor
-
-
-def shift2pos(camera: CodedMaskCamera, shift_x: float, shift_y: float) -> tuple[int, int]:
-    """
-    Convert continuous sky-shift coordinates to nearest discrete pixel indices.
-
-    Args:
-        camera: CodedMaskCamera instance containing binning information
-        shift_x: x-coordinate in sky-shift space (mm)
-        shift_y: y-coordinate in sky-shift space (mm)
-
-    Returns:
-        Tuple of (row, column) indices in the discrete sky image grid
-
-    Notes:
-        TODO: Needs boundary checks for shifts outside valid range
-    """
-    return bisect(camera.bins_sky.y, shift_y) - 1, bisect(camera.bins_sky.x, shift_x) - 1
 
 
 @lru_cache(maxsize=1)
@@ -437,9 +418,9 @@ def iros(
     camera: CodedMaskCamera,
     sdl: SimulationDataLoader,
     max_iterations: int,
-    snr_threshold: float | None = None,
+    snr_threshold: float = 0.,
     dataset: Literal["detected", "reconstructed"] = "reconstructed",
-) -> Generator[tuple[dict[str, Optional[tuple[float, float, float]]], dict[str, npt.NDArray]],]:
+) -> Iterable:
     """Performs Iterative Removal of Sources (IROS) for dual-camera WFM observations.
 
     This function implements an iterative source detection and removal algorithm for
@@ -455,7 +436,7 @@ def iros(
         sdl: SimulationDataLoader containing data from both WFM cameras
         max_iterations: Maximum number of source removal iterations to perform
         snr_threshold: Optional float. If provided, iteration stops when maximum
-            residual SNR falls below this value
+            residual SNR falls below this value. Defaults to 0. (no threshold).
         dataset: Which dataset to analyze. Either "detected" (simulated data prior to reconstruction)
             or "reconstructed" (position-reconstructed data). Defaults to "reconstructed"
 
@@ -489,12 +470,14 @@ def iros(
     if not (
             np.isclose(
                 angular_separation(
-                    *map(np.deg2rad, (*sdl.rotations["cam1a"]["x"], *sdl.rotations["cam1b"]["x"]))),
-                np.pi
+                    *map(np.deg2rad, (*sdl.rotations["cam1a"]["x"], *sdl.rotations["cam1b"]["x"]))
+                ),
+                np.pi / 2
             ) and
             np.isclose(
                 angular_separation(
-                    *map(np.deg2rad, (*sdl.rotations["cam1a"]["z"], *sdl.rotations["cam1b"]["z"]))),
+                    *map(np.deg2rad, (*sdl.rotations["cam1a"]["z"], *sdl.rotations["cam1b"]["z"]))
+                ),
                 0.
             )
     ):

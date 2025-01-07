@@ -59,5 +59,6 @@ from .mask import model_sky
 from .mask import snratio
 from .mask import strip
 from .mask import variance
+from .mask import shift2pos
 from .optim import iros
 from .optim import optimize
