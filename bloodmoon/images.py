@@ -14,6 +14,7 @@ The functions handle both detector shadowgrams and reconstructed sky images.
 from bisect import bisect
 from collections import OrderedDict
 from typing import Callable, Optional
+import warnings
 
 import numpy as np
 import numpy.typing as npt
@@ -325,11 +326,31 @@ def _interp(
         a tuple of the interpolated data and their __midpoints__ (not bins!).
 
     """
+    def find_method(xs: npt.NDArray, ys: npt.NDArray):
+        mindim = min(min(xs.shape), min(ys.shape))
+        if mindim > 3:
+            return "cubic"
+        if mindim > 1:
+            method = "linear"
+        elif mindim > 0:
+            method = "nearest"
+            warnings.warn(
+                f"Interpolator bins too small for method 'cubic', resorting to '{method}'. "
+                f"Consider upscaling your mask."
+            )
+        else:
+            raise ValueError("Can not interpolate, interpolator grid is empty.")
+        return method
+
     midpoints_x = (bins.x[1:] + bins.x[:-1]) / 2
     midpoints_y = (bins.y[1:] + bins.y[:-1]) / 2
     midpoints_x_fine = np.linspace(midpoints_x[0], midpoints_x[-1], len(midpoints_x) * interp_f.x + 1)
     midpoints_y_fine = np.linspace(midpoints_y[0], midpoints_y[-1], len(midpoints_y) * interp_f.y + 1)
-    interp = RegularGridInterpolator((midpoints_x, midpoints_y), tile.T, method="cubic")
+    interp = RegularGridInterpolator(
+        (midpoints_x, midpoints_y),
+        tile.T,
+        method=find_method(midpoints_x, midpoints_y),
+    )
     grid_x_fine, grid_y_fine = np.meshgrid(midpoints_x_fine, midpoints_y_fine)
     tile_interp = interp((grid_x_fine, grid_y_fine))
     return tile_interp, BinsRectangular(x=midpoints_x_fine, y=midpoints_y_fine)

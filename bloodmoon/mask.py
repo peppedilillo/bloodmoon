@@ -25,7 +25,6 @@ from scipy.signal import convolve
 from scipy.signal import correlate
 from scipy.stats import binned_statistic_2d
 
-from .coords import _to_angles
 from .images import _erosion
 from .images import _interp
 from .images import _rbilinear_relative
@@ -136,9 +135,9 @@ class CodedMaskCamera:
     upscale_f: UpscaleFactor
 
     @property
-    def parameters(self) -> dict:
+    def specs(self) -> dict:
         """Returns a dictionary of mask parameters useful for image reconstruction."""
-        return self.mdl.parameters
+        return self.mdl.specs
 
     def _bins_mask(
         self,
@@ -186,11 +185,6 @@ class CodedMaskCamera:
     def bins_sky(self) -> BinsRectangular:
         """Returns bins for the sky-shift domain"""
         return self._bins_sky(self.upscale_f)
-
-    @cached_property
-    def bins_angle_sky(self) -> BinsRectangular:
-        """Returns bins for the sky-shift domain"""
-        return BinsRectangular(*_to_angles(self.bins_sky.x, self.bins_sky.y, self.mdl["mask_detector_distance"]))
 
     @cached_property
     def mask(self) -> npt.NDArray:
@@ -300,7 +294,7 @@ def variance(
     camera: CodedMaskCamera,
     detector: npt.NDArray,
 ) -> npt.NDArray:
-    """Reconstruct balanced sky variance from detector counts using cross-correlation.
+    """Reconstruct balanced sky variance from detector counts.
 
     Args:
         camera: CodedMaskCamera object containing mask and decoder patterns
@@ -375,7 +369,7 @@ def psf(camera: CodedMaskCamera) -> npt.NDArray:
 def count(
     camera: CodedMaskCamera,
     data: npt.NDArray,
-) -> npt.NDArray:
+) -> tuple[npt.NDArray, npt.NDArray]:
     """Create 2D histogram of detector counts from event data.
 
     Args:
@@ -501,9 +495,13 @@ def _interpmax(
         Sky-shift position of the interpolated maximum.
     """
     (min_i, max_i, min_j, max_j), bins = strip(camera, pos)
+    # we want to use the cubic interpolator so we take a larger window using chop
+    # if strip get us a slice too small. this may happen for masks with no upscaling.
+    if not (max_i - min_i > 1 and min_j - max_j > 1):
+        (min_i, max_i, min_j, max_j), bins = chop(camera, pos)
     tile_interp, bins_fine = _interp(sky[min_i:max_i, min_j:max_j], bins, interp_f)
     max_tile_i, max_tile_j = argmax(tile_interp)
-    return tuple(map(float, (bins_fine.x[max_tile_j], bins_fine.y[max_tile_i])))
+    return float(bins_fine.x[max_tile_j]), float(bins_fine.y[max_tile_i])
 
 
 _PSFX_WFM_PARAMS = {

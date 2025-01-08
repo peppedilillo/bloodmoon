@@ -37,19 +37,13 @@ optimize : Function
 iros : Function
     Source subtraction by Iterative Removal of Sources method.
 
-Example:
---------
->>> import bloodmoon
->>> wfm = bloodmoon.codedmask("wfm_mask.fits")  # Load camera
->>> sdl = bloodmoon.simulation("simdata/")    # Load simulation
->>> detector, bins = bloodmoon.count(wfm, sdl.reconstructed["cam1a"])
->>> sky = bloodmoon.decode(wfm, detector)     # Reconstruct sky image
 
 For detailed documentation on specific functions, use help() on the individual
 components or refer to the module docstrings.
 """
 
 from .io import simulation
+from .io import simulation_files
 from .mask import chop
 from .mask import codedmask
 from .mask import count

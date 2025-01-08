@@ -284,7 +284,7 @@ def _loss(model_f: Callable) -> Callable:
         model_chopped = model[min_i:max_i, min_j:max_j]
         residual = truth_chopped - model_chopped
         mse = np.mean(np.square(residual))
-        return mse
+        return float(mse)
 
     return f
 
@@ -416,7 +416,8 @@ jesus pleasee look upon it
 
 def iros(
     camera: CodedMaskCamera,
-    sdl: SimulationDataLoader,
+    sdl_cam1a: SimulationDataLoader,
+    sdl_cam1b: SimulationDataLoader,
     max_iterations: int,
     snr_threshold: float = 0.,
     dataset: Literal["detected", "reconstructed"] = "reconstructed",
@@ -433,7 +434,8 @@ def iros(
 
     Args:
         camera: CodedMaskCamera instance containing mask/detector geometry and parameters
-        sdl: SimulationDataLoader containing data from both WFM cameras
+        sdl_cam1a: SimulationDataLoader for the first WFM  camera
+        sdl_cam1b: SimulationDataLoader for the second WFM camera
         max_iterations: Maximum number of source removal iterations to perform
         snr_threshold: Optional float. If provided, iteration stops when maximum
             residual SNR falls below this value. Defaults to 0. (no threshold).
@@ -441,10 +443,11 @@ def iros(
             or "reconstructed" (position-reconstructed data). Defaults to "reconstructed"
 
     Yields:
-        For each iteration, a tuple containing:
-            - Dictionary mapping camera IDs to (x, y, fluence) tuples for detected sources,
+        For each iteration, yields:
+            - A tuple of two (x, y, fluence) tuples, one for each camera's detected source,
               where x,y are sky-shift coordinates in mm and fluence is source intensity
-            - Dictionary mapping camera IDs to residual sky images after source removal
+            - A tuple of two residual sky images after source removal, one for each camera
+            Note: Results are ordered to match sdl_cam1a, sdl_cam1b order
 
     Raises:
         ValueError: If cameras are not oriented orthogonally (90° rotation in azimuth)
@@ -457,31 +460,42 @@ def iros(
           (upscale_x * upscale_y ~< 10) for reasonable performance
 
         Algorithm Details:
-        - Requires orthogonal camera views (90° rotation) for reliable source localization
+        - Requires orthogonal camera views (90° rotation) for source localization
         - Ranks candidates by SNR and integrated intensity within aperture
         - Optimizes source parameters in local windows around candidates
         - When using reconstructed data, accounts for vignetting and PSF effects
+
+    Example:
+    >>> for sources, residuals in iros(camera, sdl_cam1a, sdl_cam1b, max_iterations=2):
+    >>>     source_1a, source_1b = sources
+    >>>     residual_1a, residual_1b = residuals
+    >>>     ...
     """
     from astropy.coordinates import angular_separation
 
-    # Verify cameras are oriented orthogonally (90° rotation in azimuth)
-    # This is required for the source position matching algorithm
+    # verify cameras are oriented orthogonally (90° rotation in azimuth).
+    # this is required for the source position matching algorithm.
+    # then sort the data loaders into a tuple so that the second's data loader
+    # x axis is at +90° from the first one.
     # fmt: off
-    if not (
-            np.isclose(
-                angular_separation(
-                    *map(np.deg2rad, (*sdl.rotations["cam1a"]["x"], *sdl.rotations["cam1b"]["x"]))
-                ),
-                np.pi / 2
-            ) and
-            np.isclose(
-                angular_separation(
-                    *map(np.deg2rad, (*sdl.rotations["cam1a"]["z"], *sdl.rotations["cam1b"]["z"]))
-                ),
-                0.
-            )
+    if not np.isclose(
+        angular_separation(
+            *map(np.deg2rad, (*sdl_cam1a.rotations["z"], *sdl_cam1b.rotations["z"]))
+        ),
+        0.
+    ) or not np.isclose(
+        np.abs(
+            delta_rot_x := angular_separation(
+                *map(np.deg2rad, (*sdl_cam1a.rotations["x"], *sdl_cam1b.rotations["x"])))
+        ),
+        np.pi / 2
     ):
         raise ValueError("Cameras must be rotated by 90° degrees over azimuth.")
+    else:
+        if delta_rot_x > 0:
+            sdls = (sdl_cam1a, sdl_cam1b)
+        else:
+            sdls = (sdl_cam1b, sdl_cam1a)
     # fmt: on
 
     if dataset not in ["detected", "reconstructed"]:
@@ -501,107 +515,115 @@ def iros(
         min_slit = min(camera.mdl["slit_deltax"], camera.mdl["slit_deltay"])
         return abs(ax - bx) < min_slit and abs(ay - by) < min_slit
 
-    def match(pending: dict) -> tuple:
+    def match(pending: tuple) -> tuple:
         """Cross-check the last entry in pending to match against all other pending directions"""
-        c1, c2 = sdl.camkeys
-        if not pending[c1] or not pending[c2]:
+        pa, pb = pending
+        if not pa or not pb:
             return tuple()
 
         # we are going to call this each time we get a new couple of candidate indices.
         # we avoid evaluating matches for all pairs at all calls, which would result in
         # repeated evaluations of the same pairs (would result in O(n^3) worst case for
         # `find_candidates`)
-        latest_a = pending[c1][-1]
-        for b in pending[c2]:
+        *_, latest_a = pa
+        for b in pb:
             if direction_match(latest_a, b):
                 return latest_a, b
 
-        latest_b = pending[c2][-1]
-        for a in pending[c1]:
+        *_, latest_b = pb
+        for a in pa:
             if direction_match(a, latest_b):
                 return a, latest_b
         return tuple()
 
-    def init_get_arg(skys: dict, batchsize: int = 1000) -> Callable:
-        """This hides a reservoir-batch mechanism for quickly selecting candidates,
+    def init_get_arg(skys: tuple, batchsize: int = 1000) -> Callable:
+        """This hides a reservoirs-batch mechanism for quickly selecting candidates,
         and initializes the data structures it relies on."""
         # variance is clipped to improve numerical stability for off-axis sources,
         # which may result in very few counts.
-        snrs = {c: snratio(skys[c], np.clip(vars[c], a_min=1, a_max=None)) for c in sdl.camkeys}
+        snrs = tuple(
+            snratio(sky, np.clip(var_, a_min=1, a_max=None))
+            for sky, var_ in zip(skys, variances)
+        )
+
         # we sort source directions by significance.
         # this is kind of costly because the sky arrays may be very large.
         # TODO: improve on this only sorting matrix elements over a threshold.
         # sorted directions are moved to a reservoir.
-        reservoir = {c: np.argsort(snrs[c], axis=None) for c in sdl.camkeys}
+        reservoirs = [np.argsort(snr, axis=None) for snr in snrs]
 
         # integrating source intensities over aperture for all matrix elements is
         # computationally unfeasable. to avoid this, we execute this computation over small batches.
-        batches = {c: np.array([]) for c in sdl.camkeys}
+        batches = [np.array([]), np.array([])]
 
         def slit_intensity():
             """Integrates source intensity over mask's aperture."""
-            intensities = {c: [] for c in sdl.camkeys}
-            for c in sdl.camkeys:
-                for arg in batches[c]:
+            intensities = ([], [])
+            for int_, snr, batch in zip(
+                intensities,
+                snrs,
+                batches,
+            ):
+                for arg in batch:
                     (min_i, max_i, min_j, max_j), _ = strip(camera, arg)
-                    slit = snrs[c][min_i:max_i, min_j:max_j]
-                    intensities[c].append(np.sum(slit))
+                    slit = snr[min_i:max_i, min_j:max_j]
+                    int_.append(np.sum(slit))
             return intensities
 
         def fill():
             """Fill the batches with sorted candidates"""
-            for c in sdl.camkeys:
-                tail, head = reservoir[c][:-batchsize], reservoir[c][-batchsize:]
-                batches[c] = np.array([np.unravel_index(id, snrs[c].shape) for id in head])
-                reservoir[c] = tail
+            for i, _ in enumerate(sdls):
+                tail, head = reservoirs[i][:-batchsize], reservoirs[i][-batchsize:]
+                batches[i] = np.array([np.unravel_index(id, snrs[i].shape) for id in head])
+                reservoirs[i] = tail
 
             # integrates over mask element aperture and sum between cameras
-            argsort_intensities = np.argsort(np.sum([slit_intensity()[c] for c in sdl.camkeys], axis=0))
+            argsort_intensities = np.argsort(np.sum(slit_intensity(), axis=0))
 
             # sort candidates in present batch by their integrated-combined intensity
-            for c in sdl.camkeys:
-                batches[c] = batches[c][argsort_intensities]
+            for i, _ in enumerate(sdls):
+                batches[i] = batches[i][argsort_intensities]
 
         def empty():
             """Checks if batches are empty"""
-            return all(not len(batches[c]) for c in sdl.camkeys)
+            return all(not len(b) for b in batches)
 
-        def get() -> dict | None:
+        def get() -> tuple | None:
             """Think of this as a faucet getting you one decent direction combo at a time."""
             if empty():
                 fill()
                 if empty():
                     return None
 
-            out = {c: batches[c][-1] for c in sdl.camkeys}
-            for c in sdl.camkeys:
-                batches[c] = batches[c][:-1]
+            out = tuple(batch[-1] for batch in batches)
+            for i, _ in enumerate(sdls):
+                batches[i] = batches[i][:-1]
             return out
 
-        return get if max(map(np.max, snrs.values())) > snr_threshold else lambda: None
+        return get if max(map(np.max, snrs)) > snr_threshold else lambda: None
 
-    def find_candidates(skys: dict, max_pending=6666) -> dict:
+    def find_candidates(skys: tuple, max_pending=6666) -> tuple:
         """Returns candidate, compatible sources for the two cameras.
         Worst case complexity is O(n^2) but amortized costs are much smaller."""
         get_arg = init_get_arg(skys)
-        pending = {c: [] for c in sdl.camkeys}
+        pending = ([], [])
 
         while not (matches := match(pending)):
             args = get_arg()
             if args is None:
                 break
-            for c in sdl.camkeys:
-                pending[c].append(args[c])
-                if len(pending[c]) > max_pending:
-                    pending[c] = pending[c][-max_pending:]
-        return {c: m for c, m in zip(sdl.camkeys, matches)} if matches else {}
+            for stack, arg in zip(pending, args):
+                stack.append(arg)
+                if len(stack) > max_pending:
+                    stack.pop(0)
+        return matches if matches else tuple()
 
-    def subtract(arg: tuple[int, int], sky: np.array):
+    def subtract(arg: tuple[int, int], sky: np.ndarray):
         """Runs optimizer and subtract source."""
         try:
             source = optimize(
                 camera,
-                skys[c],
+                sky,
                 arg,
                 psfy=True if dataset == "reconstructed" else False,
                 vignetting=True if dataset == "reconstructed" else False,
@@ -612,22 +634,16 @@ def iros(
         residual = sky - model
         return source, residual
 
-    _dataset = sdl.reconstructed if dataset == "reconstructed" else "detected"
-    detectors = {c: count(camera, _dataset[c])[0] for c in sdl.camkeys}
-    skys = {c: decode(camera, detectors[c]) for c in sdl.camkeys}
-    vars = {c: variance(camera, detectors[c]) for c in sdl.camkeys}
-
-    sources = {c: None for c in sdl.camkeys}
+    detectors = tuple(count(camera, sdl.data)[0] for sdl in sdls)
+    variances = tuple(variance(camera, d) for d in detectors)
+    skys = tuple(decode(camera, d) for d in detectors)
     for i in range(max_iterations):
         candidates = find_candidates(skys)
         if not candidates:
             break
-        for c, candidate_index in candidates.items():
-            try:
-                source, residual = subtract(candidate_index, skys[c])
-            except RuntimeError as e:
-                warnings.warn(f"Could not optimize candidate {candidate_index} for camera {c} at iteration {i}:\n\n{e}")
-                continue
-            sources[c] = source
-            skys[c] = residual
-        yield {k: v for k, v in sources.items()}, {k: v for k, v in skys.items()}
+        try:
+            sources, skys = zip(*(subtract(index, sky) for index, sky in zip(candidates, skys)))
+        except RuntimeError as e:
+            warnings.warn(f"Optimizer failed at iteration {i}:\n\n{e}")
+            continue
+        yield (sources, skys) if sdls == (sdl_cam1a, sdl_cam1b) else (sources[::-1], skys)

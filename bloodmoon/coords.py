@@ -8,11 +8,11 @@ This module provides functions to convert between different coordinate systems:
 
 The transformations account for the instrument geometry and pointing direction.
 """
-from multiprocessing.managers import Value
 
 import numpy as np
 import numpy.typing as npt
 
+from .mask import CodedMaskCamera
 from .io import SimulationDataLoader
 from .types import BinsEquatorial
 from .types import BinsRectangular
@@ -21,40 +21,34 @@ from .types import CoordEquatorial
 
 def shift2equatorial(
     sdl: SimulationDataLoader,
+    camera: CodedMaskCamera,
     shift_x: float,
     shift_y: float,
-    camkey: str
 ) -> CoordEquatorial:
     """Convert sky-shift coordinates to equatorial coordinates (RA/Dec) for a specific camera.
 
     Args:
-        sdl: SimulationDataLoader containing camera pointings and geometry
+        sdl: SimulationDataLoader containing camera pointings
+        camera: CodedMaskCamera object containing mask pattern and mask-detector distance
         shift_x: X coordinate in sky-shift space (mm)
         shift_y: Y coordinate in sky-shift space (mm)
-        camkey: Camera identifier (e.g., "cam1a", "cam1b"). Must be one of sdl.camkeys
 
     Returns:
         CoordEquatorial containing:
             - ra: Right ascension in degrees [0, 360]
             - dec: Declination in degrees [-90, 90]
 
-    Raises:
-        ValueError: If camkey is not a valid camera identifier in sdl.camkeys
-
     Notes:
         - Input coordinates and distance must use consistent units
         - RA is normalized to [0, 360) degree range
         - Zero point in sky-shift space is the optical axis
     """
-    if camkey not in sdl.camkeys:
-        raise ValueError("Argument `camkey` is not a valid camera key. Check `sdl.camkeys`.")
-
     return _shift2equatorial(
         shift_x,
         shift_y,
-        sdl.pointings[camkey]["z"],
-        sdl.pointings[camkey]["x"],
-        sdl.mask_detector_distance,
+        sdl.pointings["z"],
+        sdl.pointings["x"],
+        camera.specs["mask_detector_distance"],
     )
 
 
@@ -65,24 +59,25 @@ def _shift2equatorial(
     pointing_radec_x: CoordEquatorial,
     distance_detector_mask: float,
 ) -> CoordEquatorial:
-    """Convert sky-shift coordinates to equatorial coordinates (RA/Dec).
+    """Implementation to `shift2equatorial`.
 
     Args:
-        shift_x: X coordinates in sky-shift space (mm)
-        shift_y: Y coordinates in sky-shift space (mm)
-        pointing_radec_z: Detector z-axis pointing in (RA, Dec) degrees
-        pointing_radec_x: Detector x-axis pointing in (RA, Dec) degrees
-        distance_detector_mask: Distance between detector and mask planes (mm)
+        shift_x: X coordinate on the sky-shift plane in spatial units (e.g., mm or cm).
+            Dimension should match shift_y and distance_detector_mask.
+        shift_y: X coordinate on the sky-shift plane in spatial units (e.g., mm or cm).
+            Dimension should match shift_x and distance_detector_mask.
+        pointing_radec_z: Pointing direction of the detector's z-axis in
+            (RA, Dec) coordinates in degrees.
+        pointing_radec_x: Pointing direction of the detector's x-axis in
+            (RA, Dec) coordinates in degrees. Used to define the detector's roll angle.
+        distance_detector_mask: Distance between the detector and mask planes in the same
+            spatial units as midpoints_xs and midpoints_ys.
 
     Returns:
-        CoordEquatorial containing:
-            - ra: Right ascension in degrees [0, 360]
-            - dec: Declination in degrees [-90, 90]
-
-    Notes:
-        - Input coordinates and distance must use consistent units
-        - RA is normalized to [0, 360) degree range
-        - Zero point in sky-shift space is the optical axis
+        BinsEquatorial record containing:
+            - `dec` field: Grid of declination values in degrees, same shape as input arrays
+            - `ra` field: Grid of right ascension values in degrees, same shape as input arrays.
+              Values are in the range [0, 360] degrees.
     """
     rotmat_sky2cam, rotmat_cam2sky = _rotation_matrices(
         pointing_radec_z,
@@ -123,7 +118,7 @@ def _rotation_matrices(
             RA in [0, 360], Dec in [-90, 90].
 
     Returns:
-        tuple[np.ndarray, np.ndarray]: A tuple containing:
+        A tuple containing:
             - rotmat_sky2cam (np.ndarray): 3x3 rotation matrix to transform vectors
               from equatorial to camera coordinates
             - rotmat_cam2sky (np.ndarray): 3x3 rotation matrix to transform vectors
@@ -167,12 +162,11 @@ def _rotation_matrices(
     return rotmat_sky2cam, rotmat_cam2sky
 
 
-def _to_sky_coordinates(
+def shiftgrid2equatorial(
+    sdl: SimulationDataLoader,
+    camera: CodedMaskCamera,
     midpoints_sky_xs: npt.NDArray,
     midpoints_sky_ys: npt.NDArray,
-    pointing_radec_z: tuple[float, float],
-    pointing_radec_x: tuple[float, float],
-    distance_detector_mask: float,
 ) -> BinsEquatorial:
     """
     Converts sky-shift coordinates to equatorial sky coordinates (RA/Dec).
@@ -183,16 +177,12 @@ def _to_sky_coordinates(
     For batch computations.
 
     Args:
-        midpoints_sky_xs (np.array): X coordinates of the grid points on the sky-shift plane in spatial units
+        sdl: SimulationDataLoader containing camera pointings
+        camera: CodedMaskCamera object containing mask pattern and mask-detector distance
+        midpoints_sky_xs: X coordinates of the grid points on the sky-shift plane in spatial units
             (e.g., mm or cm). Shape and dimension should match midpoints_ys.
-        midpoints_sky_ys (np.array): Y coordinates of the grid points on the sky-shift plane in spatial units
+        midpoints_sky_ys: Y coordinates of the grid points on the sky-shift plane in spatial units
             (e.g., mm or cm). Shape and dimension should match midpoints_xs.
-        pointing_radec_z (tuple[float, float]): Pointing direction of the detector's z-axis in
-            (RA, Dec) coordinates in degrees.
-        pointing_radec_x (tuple[float, float]): Pointing direction of the detector's x-axis in
-            (RA, Dec) coordinates in degrees. Used to define the detector's roll angle.
-        distance_detector_mask (float): Distance between the detector and mask planes in the same
-            spatial units as midpoints_xs and midpoints_ys.
 
     Returns:
         BinsEquatorial record containing:
@@ -213,13 +203,51 @@ def _to_sky_coordinates(
         >>> midpoints_x = (wfm.bins_sky.x[1:] + wfm.bins_sky.x[:-1]) / 2
         >>> midpoints_y = (wfm.bins_sky.y[1:] + wfm.bins_sky.y[:-1]) / 2
         >>> xx, yy = np.meshgrid(midpoints_x, midpoints_y)
-        >>> coords_ra, coords_dec = to_sky_coordinates(
+        >>> coords_ra, coords_dec = shiftgrid2equatorial(
+        >>>     sdl,
+        >>>     wfm,
         >>>     xx,
         >>>     yy,
-        >>>     pointing_radec_z=sdl.pointings["cam1a"]["z"],
-        >>>     pointing_radec_x=sdl.pointings["cam1a"]["x"],
         >>>     distance_detector_mask=wfm.mdl["mask_detector_distance"],
         >>> )
+    """
+    return _shiftgrid2equatorial(
+        midpoints_sky_xs,
+        midpoints_sky_ys,
+        sdl.pointings["z"],
+        sdl.pointings["x"],
+        camera.specs["mask_detector_distance"],
+    )
+
+
+def _shiftgrid2equatorial(
+    midpoints_sky_xs: npt.NDArray,
+    midpoints_sky_ys: npt.NDArray,
+    pointing_radec_z: tuple[float, float],
+    pointing_radec_x: tuple[float, float],
+    distance_detector_mask: float,
+) -> BinsEquatorial:
+    """Implementation to `shiftgrid2equatorial`.
+
+    Args:
+        midpoints_sky_xs: X coordinates of the grid points on the sky-shift plane in spatial units
+            (e.g., mm or cm). Shape should match midpoints_ys.
+            Dimension should match midpoint_ys and distance_detector_mask.
+        midpoints_sky_ys: Y coordinates of the grid points on the sky-shift plane in spatial units
+            (e.g., mm or cm). Shape should match midpoints_xs.
+            Dimension should match midpoint_xs and distance_detector_mask.
+        pointing_radec_z: Pointing direction of the detector's z-axis in
+            (RA, Dec) coordinates in degrees.
+        pointing_radec_x: Pointing direction of the detector's x-axis in
+            (RA, Dec) coordinates in degrees. Used to define the detector's roll angle.
+        distance_detector_mask: Distance between the detector and mask planes in the same
+            spatial units as midpoints_xs and midpoints_ys.
+
+    Returns:
+        BinsEquatorial record containing:
+            - `dec` field: Grid of declination values in degrees, same shape as input arrays
+            - `ra` field: Grid of right ascension values in degrees, same shape as input arrays.
+              Values are in the range [0, 360] degrees.
     """
     rotmat_sky2cam, rotmat_cam2sky = _rotation_matrices(
         pointing_radec_z,
@@ -262,11 +290,11 @@ def _to_angles(
     Expresses the sky-shift coordinates in terms of angle between source and the detector center.
 
     Args:
-        midpoints_xs (np.array): X coordinates of the grid points on the sky-shift plane in spatial units
+        midpoints_xs: X coordinates of the grid points on the sky-shift plane in spatial units
             (e.g., mm or cm). Shape and dimension should match midpoints_ys.
-        midpoints_ys (np.array): Y coordinates of the grid points on the sky-shift plane in spatial units
+        midpoints_ys: Y coordinates of the grid points on the sky-shift plane in spatial units
             (e.g., mm or cm). Shape and dimension should match midpoints_xs.
-        distance_detector_mask (float): Distance between the detector and mask planes in the same
+        distance_detector_mask: Distance between the detector and mask planes in the same
             spatial units as midpoints_xs and midpoints_ys.
 
 

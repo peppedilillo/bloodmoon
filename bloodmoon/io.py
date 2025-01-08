@@ -20,125 +20,119 @@ from bloodmoon.types import CoordEquatorial
 from bloodmoon.types import CoordHorizontal
 
 
-def _get_simulation_fits_data(
-    filedict: dict,
-    kind: str,
-    headers: bool = False,
-) -> dict:
-    """
-    Load data or headers from FITS simulation files for both WFM cameras.
+def _validate_fits(filepath: Path) -> bool:
+    """Following astropy's approach, reads the first FITS card (80 bytes) and checks for
+    the SIMPLE keyword signature.
 
     Args:
-        filedict: Dictionary containing file paths for both cameras (i.e., Dataloader.simulation_files)
-        kind: Type of data to load ('detected', 'reconstructed', or 'sources')
-        headers: If True, return headers instead of data
+        filepath: Path object pointing to the file to validate
 
     Returns:
-        Dictionary mapping camera IDs to their respective data or headers
+        bool: True if file has a valid FITS signature, False otherwise
+    """
+    try:
+        with open(filepath, "rb") as file:
+            # FITS signature is supposed to be in the first 30 bytes, but to
+            # allow reading various invalid files we will check in the first
+            # card (80 bytes).
+            simple = file.read(80)
+    except OSError:
+        return False
+
+    fits_signature = b"SIMPLE  =                    T"
+
+    match_sig = simple[:29] == fits_signature[:-1] and simple[29:30] in (b"T", b"F")
+    return match_sig
+
+
+def simulation_files(dirpath: str | Path) -> dict[str, dict[str, Path]]:
+    """
+    Locate and validate all required FITS files in the root directory.
+
+    Returns:
+        Nested dictionary mapping camera IDs to their respective file paths
+        for detected, reconstructed, and source data.
+
+    Raises:
+        ValueError: If expected files are missing or if multiple matches are found
     """
 
-    def fits2data(f: Path, headers: bool):
-        data, header = fits.getdata(f, ext=1, header=True)
-        if headers:
-            return header
-        return data
+    def check_and_pick(parent: Path, pattern: str) -> Path:
+        matches = tuple(parent.glob(pattern))
+        if not matches:
+            raise ValueError(f"A file matching the pattern {str(parent / pattern)} is expected but missing.")
+        f, *extra_matches = matches
+        if extra_matches:
+            raise ValueError(
+                f"Found unexpected extra matches for glob pattern {str(parent / pattern)}."
+                f"File with pattern {pattern} should be unique"
+            )
+        return f
 
-    return {k: fits2data(filedict[k][kind], headers) for k in ["cam1a", "cam1b"]}
+    dirpath = Path(dirpath)
+    return {
+        "cam1a": {
+            "detected": check_and_pick(dirpath, "cam1a/*detected_plane.fits"),
+            "reconstructed": check_and_pick(dirpath, "cam1a/*reconstructed.fits"),
+            "sources": check_and_pick(dirpath, "cam1a/*sources.fits"),
+        },
+        "cam1b": {
+            "detected": check_and_pick(dirpath, "cam1b/*detected_plane.fits"),
+            "reconstructed": check_and_pick(dirpath, "cam1b/*reconstructed.fits"),
+            "sources": check_and_pick(dirpath, "cam1b/*sources.fits"),
+        },
+    }
 
 
 @dataclass(frozen=True)
 class SimulationDataLoader:
     """
-    An immutable dataclass for loading WFM simulation data from FITS files.
+    Container for WFM coded mask simulation data.
 
-    The class handles data from two cameras (cam1a and cam1b), each containing detected,
-    reconstructed, and source data. It provides access to both the data and headers of
-    these files, as well as pointing information for the cameras in those simulations.
+    The class provides access to photon events and instrument configuration from a
+    FITS file containing WFM simulation data for a single camera.
 
     Attributes:
-        root: Path to root directory containing the simulation data files
+        filepath (Path): Path to the FITS file
+
+    Properties:
+        data: Photon event data from FITS extension 1
+        header: Primary FITS header
+        mask_detector_distance (float): Distance between mask and detector in mm
+        pointings (dict[str, CoordEquatorial]): Camera axis directions in equatorial frame
+            - 'z': Optical axis pointing (RA/Dec)
+            - 'x': Camera x-axis pointing (RA/Dec)
+        rotations (dict[str, CoordHorizontal]): Camera axis directions in the instrument's frame
+            - 'z': Optical axis pointing (azimuth/altitude)
+            - 'x': Camera x-axis pointing (azimuth/altitude)
     """
-
-    root: Path
-
-    @property
-    def camkeys(self) -> list[str]:
-        return ["cam1a", "cam1b"]
+    filepath: Path
 
     @cached_property
-    def simulation_files(self):
-        """
-        Locate and validate all required FITS files in the root directory.
-
-        Returns:
-            Nested dictionary mapping camera IDs to their respective file paths
-            for detected, reconstructed, and source data.
-
-        Raises:
-            ValueError: If expected files are missing or if multiple matches are found
-        """
-
-        def check_and_pick(parent: Path, pattern: str) -> Path:
-            matches = tuple(parent.glob(pattern))
-            if not matches:
-                raise ValueError(f"A file matching the pattern {str(parent / pattern)} is expected but missing.")
-            f, *extra_matches = matches
-            if extra_matches:
-                raise ValueError(
-                    f"Found unexpected extra matches for glob pattern {str(parent / pattern)}."
-                    f"File with pattern {pattern} should be unique"
-                )
-            return f
-
-        return {
-            "cam1a": {
-                "detected": check_and_pick(self.root, "cam1a/*detected_plane.fits"),
-                "reconstructed": check_and_pick(self.root, "cam1a/*reconstructed.fits"),
-                "sources": check_and_pick(self.root, "cam1a/*sources.fits"),
-            },
-            "cam1b": {
-                "detected": check_and_pick(self.root, "cam1b/*detected_plane.fits"),
-                "reconstructed": check_and_pick(self.root, "cam1b/*reconstructed.fits"),
-                "sources": check_and_pick(self.root, "cam1b/*sources.fits"),
-            },
-        }
+    def data(self) -> FITS_rec:
+        return fits.getdata(self.filepath, ext=1, header=False)
 
     @cached_property
-    def mask_detector_distance(self) -> float:
-        """
-        Extract mask-detector distance from reconstructed file headers.
-
-        Returns:
-            The distance between the mask bottom and the detector top, in mm.
-        """
-        header_1a = fits.getheader(self.simulation_files["cam1a"]["reconstructed"], ext=0)
-        return float(header_1a["MDDIST"])
+    def header(self) -> Header:
+        return fits.getheader(self.filepath, ext=0)
 
     @cached_property
-    def pointings(self) -> dict[str, dict[str, CoordEquatorial]]:
+    def pointings(self) -> dict[str, CoordEquatorial]:
         """
-        Extract camera axis pointing information in equatorial frame from reconstructed file headers.
+        Extract camera axis pointing information in equatorial frame from file header.
         Angles are expressed in degrees.
 
         Returns:
             Nested dictionary containing RA/Dec coordinates for both cameras'
             z and x axes.
         """
-        header_1a = fits.getheader(self.simulation_files["cam1a"]["reconstructed"], ext=0)
-        header_1b = fits.getheader(self.simulation_files["cam1b"]["reconstructed"], ext=0)
         return {
-            "cam1a": {
-                "z": CoordEquatorial(ra=header_1a["CAMZRA"], dec=header_1a["CAMZDEC"]),
-                "x": CoordEquatorial(ra=header_1a["CAMXRA"], dec=header_1a["CAMXDEC"]),
-            },
-            "cam1b": {
-                "z": CoordEquatorial(ra=header_1b["CAMZRA"], dec=header_1b["CAMZDEC"]),
-                "x": CoordEquatorial(ra=header_1b["CAMXRA"], dec=header_1b["CAMXDEC"]),
-            },
+            "z": CoordEquatorial(ra=self.header["CAMZRA"], dec=self.header["CAMZDEC"]),
+            "x": CoordEquatorial(ra=self.header["CAMXRA"], dec=self.header["CAMXDEC"]),
         }
 
     @cached_property
-    def rotations(self) -> dict[str, dict[str, CoordHorizontal]]:
+    def rotations(self) -> dict[str, CoordHorizontal]:
         """
         Extract camera axis directions in the instrument frame from reconstructed file header.
         Angles expressed in degrees.
@@ -147,114 +141,56 @@ class SimulationDataLoader:
             Nested dictionary containing RA/Dec coordinates for both cameras'
             z and x axes.
         """
-        header_1a = fits.getheader(self.simulation_files["cam1a"]["reconstructed"], ext=0)
-        header_1b = fits.getheader(self.simulation_files["cam1b"]["reconstructed"], ext=0)
         return {
-            "cam1a": {
-                "z": CoordHorizontal(az=header_1a["CAMZPH"], al=90 - header_1a["CAMZTH"]),
-                "x": CoordHorizontal(az=header_1a["CAMXPH"], al=90 - header_1a["CAMXTH"]),
-            },
-            "cam1b": {
-                "z": CoordHorizontal(az=header_1b["CAMZPH"], al=90 - header_1b["CAMZTH"]),
-                "x": CoordHorizontal(az=header_1b["CAMXPH"], al=90 - header_1b["CAMXTH"]),
-            },
+            "z": CoordHorizontal(az=self.header["CAMZPH"], al=90 - self.header["CAMZTH"]),
+            "x": CoordHorizontal(az=self.header["CAMXPH"], al=90 - self.header["CAMXTH"]),
         }
 
-    @property
-    def detected(self) -> dict[str, FITS_rec]:
-        """
-        Load photons data without plane position reconstruction effects from both cameras.
 
-        Returns:
-            Dictionary mapping camera IDs to their detected plane data arrays
-        """
-        return _get_simulation_fits_data(self.simulation_files, "detected", headers=False)
-
-    @property
-    def reconstructed(self) -> dict[str, FITS_rec]:
-        """
-        Load reconstructed photons data from both cameras.
-
-        Returns:
-            Dictionary mapping camera IDs to their reconstructed data arrays
-        """
-        return _get_simulation_fits_data(self.simulation_files, "reconstructed", headers=False)
-
-    @property
-    def source(self) -> dict[str, FITS_rec]:
-        """
-        Load source data from both cameras.
-
-        Returns:
-            Dictionary mapping camera IDs to their source data arrays
-        """
-        return _get_simulation_fits_data(self.simulation_files, "sources", headers=False)
-
-    @property
-    def header_detected(self) -> dict[str, Header]:
-        """
-        Load FITS headers from detected plane files for both cameras.
-
-        Returns:
-            Dictionary mapping camera IDs to their detected plane headers
-        """
-        return _get_simulation_fits_data(self.simulation_files, "detected", headers=True)
-
-    @property
-    def header_reconstructed(self) -> dict[str, Header]:
-        """
-        Load FITS headers from reconstructed files for both cameras.
-
-        Returns:
-            Dictionary mapping camera IDs to their reconstructed data headers
-        """
-        return _get_simulation_fits_data(self.simulation_files, "reconstructed", headers=True)
-
-    @property
-    def header_source(self) -> dict[str, Header]:
-        """
-        Load FITS headers from source files for both cameras.
-
-        Returns:
-            Dictionary mapping camera IDs to their source data headers
-        """
-        return _get_simulation_fits_data(self.simulation_files, "sources", headers=True)
-
-
-def simulation(data_root: str | Path):
+def simulation(filepath: str | Path) -> SimulationDataLoader:
     """
-    Checks data and intializes MaskDataLoader.
+    Checks validity of filepath and intializes SimulationDataLoader.
 
     Args:
-        data_root: path to mask FITS file.
+        filepath: path to FITS file.
 
     Returns:
         a MaskDataLoader dataclass.
     """
-    dr = Path(data_root)
-    if not dr.is_dir():
-        raise NotADirectoryError("The simulation path is not a directory.")
-    return SimulationDataLoader(Path(data_root))
+    dr = Path(filepath)
+    if not dr.is_file():
+        raise FileNotFoundError("The simulation file does not exists.")
+    if not _validate_fits(filepath):
+        raise ValueError("File not in valid FITS format.")
+    return SimulationDataLoader(filepath)
 
 
 @dataclass(frozen=True)
 class MaskDataLoader:
     """
-    Frozen dataclass for loading and parsing mask-related FITS data from a single file.
-    Handles mask parameters and various data extensions (mask, decoder, and bulk data).
+    Container for WFM coded mask parameters and patterns.
+
+    The class provides access to mask geometry, decoder patterns, and associated
+    parameters from a single FITS file containing WFM mask data.
 
     Attributes:
-        filepath: path to mask file
+        filepath: Path to the FITS file
+
+    Properties:
+        specs: Dictionary of mask and detector dimensions
+        mask: Mask pattern data from extension 2
+        decoder: Decoder pattern data from extension 3
+        bulk: Bulk pattern data from extension 4
     """
 
     filepath: Path
 
     def __getitem__(self, key: str) -> float:
         """Access mask parameters via dictionary-style lookup."""
-        return self.parameters[key]
+        return self.specs[key]
 
     @cached_property
-    def parameters(self) -> dict[str, float]:
+    def specs(self) -> dict[str, float]:
         """
         Extract and convert mask parameters from FITS headers (extensions 0 and 2).
 
@@ -278,6 +214,7 @@ class MaskDataLoader:
                 "detector_maxx": h["PLNXMAX"],
                 "detector_miny": h["PLNYMIN"],
                 "detector_maxy": h["PLNYMAX"],
+                "mask_detector_distance": h["MDDIST"],
             }.items()
         }
 
@@ -311,36 +248,6 @@ class MaskDataLoader:
         """
         return fits.getdata(self.filepath, ext=4)
 
-    @property
-    def header_mask(self) -> fits.Header:
-        """
-        Load mask header from mask FITS file.
-
-        Returns:
-            FITS header containing mask data
-        """
-        return fits.getheader(self.filepath, ext=2)
-
-    @property
-    def header_decoder(self) -> fits.Header:
-        """
-        Load decoder header from mask FITS file.
-
-        Returns:
-            FITS header containing decoder data
-        """
-        return fits.getheader(self.filepath, ext=3)
-
-    @property
-    def header_bulk(self) -> fits.Header:
-        """
-        Load bulk header from mask FITS file.
-
-        Returns:
-            FITS header containing bulk data
-        """
-        return fits.getheader(self.filepath, ext=4)
-
 
 def fetch_mask(filepath: str | Path) -> MaskDataLoader:
     """
@@ -355,6 +262,8 @@ def fetch_mask(filepath: str | Path) -> MaskDataLoader:
     fp = Path(filepath)
     if not fp.is_file():
         raise FileNotFoundError("Mask file does not exists")
+    if not _validate_fits(filepath):
+        raise ValueError("File not in valid FITS format.")
     return MaskDataLoader(Path(filepath))
 
 
@@ -372,5 +281,5 @@ too much dataclasses
 ⢸⣿⣿⣄⠀⠸⡀⠀⠀⠀⠀⢀⡇⠠⣸⣿⣿⣿⣿⡇
 ⢸⣿⣿⣿⣷⣦⣮⣉⢉⠉⠩⠄⢴⣾⣿⣿⣿⣿⡇
 ⢸⣿⣿⢻⣿⣟⢟⡁⠀⠀⠀⠀⢇⠻⣿⣿⣿⣿⣿
-⢸⠿⣿⡈⠋⠀⠀⡇⠀⠀⠀⢰⠃⢠⣿⡟⣿⣿⢻ 
+⢸⠿⣿⡈⠋⠀⠀⡇⠀⠀⠀⢰⠃⢠⣿⡟
 """
