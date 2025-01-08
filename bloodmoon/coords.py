@@ -161,8 +161,8 @@ def _rotation_matrices(
 def shiftgrid2equatorial(
     sdl: SimulationDataLoader,
     camera: CodedMaskCamera,
-    midpoints_sky_xs: npt.NDArray,
-    midpoints_sky_ys: npt.NDArray,
+    shift_xs: npt.NDArray,
+    shift_ys: npt.NDArray,
 ) -> BinsEquatorial:
     """
     Converts sky-shift coordinates to equatorial sky coordinates (RA/Dec).
@@ -175,9 +175,9 @@ def shiftgrid2equatorial(
     Args:
         sdl: SimulationDataLoader containing camera pointings
         camera: CodedMaskCamera object containing mask pattern and mask-detector distance
-        midpoints_sky_xs: X coordinates of the grid points on the sky-shift plane in spatial units
+        shift_xs: X coordinates of the grid points on the sky-shift plane in spatial units
             (e.g., mm or cm). Shape and dimension should match midpoints_ys.
-        midpoints_sky_ys: Y coordinates of the grid points on the sky-shift plane in spatial units
+        shift_ys: Y coordinates of the grid points on the sky-shift plane in spatial units
             (e.g., mm or cm). Shape and dimension should match midpoints_xs.
 
     Returns:
@@ -193,23 +193,15 @@ def shiftgrid2equatorial(
 
     Example:
         >>> from bloodmoon import codedmask, simulation
+        >>> from bloodmoon.coords import shiftgrid2equatorial
         >>>
-        >>> sdl = simulation("..")
-        >>> wfm = codedmask("..")
-        >>> midpoints_x = (wfm.bins_sky.x[1:] + wfm.bins_sky.x[:-1]) / 2
-        >>> midpoints_y = (wfm.bins_sky.y[1:] + wfm.bins_sky.y[:-1]) / 2
-        >>> xx, yy = np.meshgrid(midpoints_x, midpoints_y)
-        >>> coords_ra, coords_dec = shiftgrid2equatorial(
-        >>>     sdl,
-        >>>     wfm,
-        >>>     xx,
-        >>>     yy,
-        >>>     distance_detector_mask=wfm.mdl["mask_detector_distance"],
-        >>> )
+        >>> wfm = codedmask("mask.fits")
+        >>> sdl = simulation("datapath.fits")
+        >>>
+        >>> ras, decs = shiftgrid2equatorial(sdl, wfm, *wfm.bins_sky)
     """
     return _shiftgrid2equatorial(
-        midpoints_sky_xs,
-        midpoints_sky_ys,
+        *np.meshgrid(shift_xs, shift_ys),
         sdl.pointings["z"],
         sdl.pointings["x"],
         camera.specs["mask_detector_distance"],
