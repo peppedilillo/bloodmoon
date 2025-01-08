@@ -6,10 +6,12 @@ build-backend = "hatchling.build"
 name = "bloodmoon"
 description = "A library for analyzing data and simulations from the WFM coded mask instrument."
 keywords = ["astrophysics", "coded masks"]
-version = "0.0.1"
+version = "0.1.0"
 authors = [
     { name="Giuseppe Dilillo", email="peppedilillo@gmail.com" },
 ]
+readme = "README.md"
+license = {file = "LICENSE"}
 requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -32,3 +34,5 @@ dev = [
     "ipython~=8.31",
 ]
 
+[project.urls]
+"Homepage" = "https://github.com/peppedilillo/bloodmoon"

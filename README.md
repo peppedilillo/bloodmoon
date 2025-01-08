@@ -11,9 +11,10 @@ A Python library for analyzing data from the Wide Field Monitor (WFM) coded mask
 
 ## Installation
 
-### PyPI (Coming Soon)
+### PyPI
+
 ```bash
-pip install CHANGEME
+pip install bloodmoon
 ```
 
 ### From Source
@@ -61,16 +62,18 @@ import bloodmoon as bm
 wfm = bm.codedmask("wfm_mask.fits")
 
 # Load simulation data
-sdl = bm.simulation("simdata/")
+filepaths = bm.simulation_files("simdir/")
+sdl1a = bm.simulation(filepaths["cam1a"]["reconstructed"])
+sdl1b = bm.simulation(filepaths["cam1b"]["reconstructed"])
 
 # Create detector images
-detector, bins = bm.count(wfm, sdl.reconstructed["cam1a"])
+detector, bins = bm.count(wfm, sdl1a.data)
 
 # Reconstruct sky image
 sky = bm.decode(wfm, detector)
 
 # Run iterative source detection
-for sources, residuals in bm.iros(wfm, sdl, max_iterations=10):
+for sources, residuals in bm.iros(wfm, sdl1a, sdl1b, max_iterations=10):
     # Process detected sources...
     pass
 ```
