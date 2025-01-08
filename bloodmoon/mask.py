@@ -11,7 +11,8 @@ This module implements the primary algorithms for:
 These components form the foundation of the WFM data analysis pipeline.
 """
 
-from bisect import bisect_left, bisect
+from bisect import bisect
+from bisect import bisect_left
 from bisect import bisect_right
 from dataclasses import dataclass
 from functools import cache

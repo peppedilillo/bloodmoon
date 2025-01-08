@@ -12,8 +12,8 @@ The transformations account for the instrument geometry and pointing direction.
 import numpy as np
 import numpy.typing as npt
 
-from .mask import CodedMaskCamera
 from .io import SimulationDataLoader
+from .mask import CodedMaskCamera
 from .types import BinsEquatorial
 from .types import BinsRectangular
 from .types import CoordEquatorial
@@ -83,17 +83,13 @@ def _shift2equatorial(
         pointing_radec_z,
         pointing_radec_x,
     )
-    r = np.sqrt(
-        shift_x * shift_x +
-        shift_y * shift_y +
-        distance_detector_mask * distance_detector_mask
-    )
+    r = np.sqrt(shift_x * shift_x + shift_y * shift_y + distance_detector_mask * distance_detector_mask)
     _v = np.array([shift_x, shift_y, distance_detector_mask]) / r
     vx, vy, vz = np.matmul(rotmat_cam2sky, _v)
     # the versors above are in the rectangular coordinates, we transform into angles
     dec = 0.5 * np.pi - np.arccos(vz)
     ra = np.arctan2(vy, vx)
-    ra += 2 * np.pi if ra < 0 else 0.
+    ra += 2 * np.pi if ra < 0 else 0.0
     dec = np.rad2deg(dec)
     ra = np.rad2deg(ra)
     return CoordEquatorial(*map(float, (ra, dec)))
@@ -255,9 +251,9 @@ def _shiftgrid2equatorial(
     )
     # point distances from the mask center.
     r = np.sqrt(
-        midpoints_sky_xs * midpoints_sky_xs +
-        midpoints_sky_ys * midpoints_sky_ys +
-        distance_detector_mask * distance_detector_mask
+        midpoints_sky_xs * midpoints_sky_xs
+        + midpoints_sky_ys * midpoints_sky_ys
+        + distance_detector_mask * distance_detector_mask
     )
     # these are the versors from the mask center to the detector elements
     versors_local_ys = midpoints_sky_ys / r

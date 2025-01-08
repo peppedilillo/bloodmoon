@@ -106,6 +106,7 @@ class SimulationDataLoader:
             - 'z': Optical axis pointing (azimuth/altitude)
             - 'x': Camera x-axis pointing (azimuth/altitude)
     """
+
     filepath: Path
 
     @cached_property

@@ -23,7 +23,7 @@ from scipy.signal import convolve
 from .images import _rbilinear_relative
 from .images import _shift
 from .io import SimulationDataLoader
-from .mask import _convolution_kernel_psfy, shift2pos
+from .mask import _convolution_kernel_psfy
 from .mask import _detector_footprint
 from .mask import _interpmax
 from .mask import apply_vignetting
@@ -33,6 +33,7 @@ from .mask import count
 from .mask import decode
 from .mask import model_shadowgram
 from .mask import model_sky
+from .mask import shift2pos
 from .mask import snratio
 from .mask import strip
 from .mask import variance
@@ -419,7 +420,7 @@ def iros(
     sdl_cam1a: SimulationDataLoader,
     sdl_cam1b: SimulationDataLoader,
     max_iterations: int,
-    snr_threshold: float = 0.,
+    snr_threshold: float = 0.0,
     dataset: Literal["detected", "reconstructed"] = "reconstructed",
 ) -> Iterable:
     """Performs Iterative Removal of Sources (IROS) for dual-camera WFM observations.
@@ -541,10 +542,7 @@ def iros(
         and initializes the data structures it relies on."""
         # variance is clipped to improve numerical stability for off-axis sources,
         # which may result in very few counts.
-        snrs = tuple(
-            snratio(sky, np.clip(var_, a_min=1, a_max=None))
-            for sky, var_ in zip(skys, variances)
-        )
+        snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skys, variances))
 
         # we sort source directions by significance.
         # this is kind of costly because the sky arrays may be very large.

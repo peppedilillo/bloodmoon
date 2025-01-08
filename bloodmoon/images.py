@@ -326,6 +326,7 @@ def _interp(
         a tuple of the interpolated data and their __midpoints__ (not bins!).
 
     """
+
     def find_method(xs: npt.NDArray, ys: npt.NDArray):
         mindim = min(min(xs.shape), min(ys.shape))
         if mindim > 3:
