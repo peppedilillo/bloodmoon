@@ -308,7 +308,7 @@ def variance(
     var = correlate(np.square(camera.decoder), detector, mode="full")
     sum_det, sum_bulk = map(np.sum, (detector, camera.bulk))
     var_bal = (
-        var + np.square(camera.balancing) * sum_det / np.square(sum_bulk) ** 2 - 2 * cc * camera.balancing / sum_bulk
+        var + np.square(camera.balancing) * sum_det / np.square(sum_bulk) - 2 * cc * camera.balancing / sum_bulk
     )
     return var_bal
 
