@@ -198,26 +198,27 @@ class MaskDataLoader:
         Returns:
             Dictionary of mask parameters (dimensions, bounds, distances) as float values
         """
-        h = dict(fits.getheader(self.filepath, ext=0)) | dict(fits.getheader(self.filepath, ext=2))
-        return {
-            k: float(v)
-            for k, v in {
-                "mask_minx": h["MINX"],
-                "mask_miny": h["MINY"],
-                "mask_maxx": h["MAXX"],
-                "mask_maxy": h["MAXY"],
-                "mask_deltax": h["ELXDIM"],
-                "mask_deltay": h["ELYDIM"],
-                "mask_thickness": h["MASKTHK"],
-                "slit_deltax": h["DXSLIT"],
-                "slit_deltay": h["DYSLIT"],
-                "detector_minx": h["PLNXMIN"],
-                "detector_maxx": h["PLNXMAX"],
-                "detector_miny": h["PLNYMIN"],
-                "detector_maxy": h["PLNYMAX"],
-                "mask_detector_distance": h["MDDIST"],
-            }.items()
-        }
+        h1 = dict(fits.getheader(self.filepath, ext=0)) | dict(fits.getheader(self.filepath, ext=2))
+        h2 = dict(fits.getheader(self.filepath, ext=3))
+
+        info = {"mask_minx": h1["MINX"],
+                "mask_miny": h1["MINY"],
+                "mask_maxx": h1["MAXX"],
+                "mask_maxy": h1["MAXY"],
+                "mask_deltax": h1["ELXDIM"],
+                "mask_deltay": h1["ELYDIM"],
+                "mask_thickness": h1["MASKTHK"],
+                "slit_deltax": h1["DXSLIT"],
+                "slit_deltay": h1["DYSLIT"],
+                "detector_minx": h1["PLNXMIN"],
+                "detector_maxx": h1["PLNXMAX"],
+                "detector_miny": h1["PLNYMIN"],
+                "detector_maxy": h1["PLNYMAX"],
+                "mask_detector_distance": h1["MDDIST"],
+                "open_fraction": h2["OPENFR"],
+                "real_open_fraction": h2["RLOPENFR"]}
+
+        return {k: float(v) for k, v in info.items()}
 
     @property
     def mask(self) -> fits.FITS_rec:
