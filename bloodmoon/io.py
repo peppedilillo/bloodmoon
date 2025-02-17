@@ -160,7 +160,7 @@ def simulation(filepath: str | Path) -> SimulationDataLoader:
     """
     dr = Path(filepath)
     if not dr.is_file():
-        raise FileNotFoundError("The simulation file does not exists.")
+        raise FileNotFoundError(f"The simulation file {dr.name} does not exists.")
     if not _validate_fits(filepath):
         raise ValueError("File not in valid FITS format.")
     return SimulationDataLoader(filepath)
