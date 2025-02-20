@@ -508,8 +508,8 @@ def iros(
     ) -> bool:
         """Determines if source positions from both cameras correspond to the same sky location.
         Compares source positions accounting for the 90° camera rotation. Positions are
-        considered matching if they are within one slit width of each other after rotation.
-        TODO: not urgent, but in a future we should make this work for arbitray camera rotations."""
+        considered matching if they are within one slit width from each other after rotation.
+        TODO: not urgent, but in a future we should make this work for arbitrary camera rotations."""
         ax, ay = camera.bins_sky.x[a[1]], camera.bins_sky.y[a[0]]
         # we apply -90deg rotation to camera b source
         bx, by = -camera.bins_sky.y[b[0]], camera.bins_sky.x[b[1]]
@@ -525,7 +525,7 @@ def iros(
         # we are going to call this each time we get a new couple of candidate indices.
         # we avoid evaluating matches for all pairs at all calls, which would result in
         # repeated evaluations of the same pairs (would result in O(n^3) worst case for
-        # `find_candidates`)
+        # `find_candidates()`
         *_, latest_a = pa
         for b in pb:
             if direction_match(latest_a, b):
@@ -537,12 +537,12 @@ def iros(
                 return a, latest_b
         return tuple()
 
-    def init_get_arg(skys: tuple, batchsize: int = 1000) -> Callable:
+    def init_get_arg(skies: tuple, batchsize: int = 1000) -> Callable:
         """This hides a reservoirs-batch mechanism for quickly selecting candidates,
         and initializes the data structures it relies on."""
         # variance is clipped to improve numerical stability for off-axis sources,
         # which may result in very few counts.
-        snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skys, variances))
+        snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
 
         # we sort source directions by significance.
         # this is kind of costly because the sky arrays may be very large.
@@ -551,7 +551,7 @@ def iros(
         reservoirs = [np.argsort(snr, axis=None) for snr in snrs]
 
         # integrating source intensities over aperture for all matrix elements is
-        # computationally unfeasable. to avoid this, we execute this computation over small batches.
+        # computationally unfeasable. To avoid this, we execute this computation over small batches.
         batches = [np.array([]), np.array([])]
 
         def slit_intensity():
@@ -600,10 +600,10 @@ def iros(
 
         return get if max(map(np.max, snrs)) > snr_threshold else lambda: None
 
-    def find_candidates(skys: tuple, max_pending=6666) -> tuple:
+    def find_candidates(skies: tuple, max_pending=6666) -> tuple:
         """Returns candidate, compatible sources for the two cameras.
         Worst case complexity is O(n^2) but amortized costs are much smaller."""
-        get_arg = init_get_arg(skys)
+        get_arg = init_get_arg(skies)
         pending = ([], [])
 
         while not (matches := match(pending)):
@@ -634,14 +634,14 @@ def iros(
 
     detectors = tuple(count(camera, sdl.data)[0] for sdl in sdls)
     variances = tuple(variance(camera, d) for d in detectors)
-    skys = tuple(decode(camera, d) for d in detectors)
+    skies = tuple(decode(camera, d) for d in detectors)
     for i in range(max_iterations):
-        candidates = find_candidates(skys)
+        candidates = find_candidates(skies)
         if not candidates:
             break
         try:
-            sources, skys = zip(*(subtract(index, sky) for index, sky in zip(candidates, skys)))
+            sources, skies = zip(*(subtract(index, sky) for index, sky in zip(candidates, skies)))
         except RuntimeError as e:
             warnings.warn(f"Optimizer failed at iteration {i}:\n\n{e}")
             continue
-        yield (sources, skys) if sdls == (sdl_cam1a, sdl_cam1b) else (sources[::-1], skys)
+        yield (sources, skies) if sdls == (sdl_cam1a, sdl_cam1b) else (sources[::-1], skies)
