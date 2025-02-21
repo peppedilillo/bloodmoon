@@ -542,6 +542,7 @@ def iros(
         and initializes the data structures it relies on."""
         # we sort source directions by significance.
         # this is kind of costly because the sky arrays may be very large.
+        # sorted directions are moved to a reservoir.
         reservoirs = [np.argsort(snr, axis=None) for snr in snrs]
 
         # integrating source intensities over aperture for all matrix elements is
@@ -616,14 +617,6 @@ def iros(
         snr_map: np.ndarray,
     ) -> tuple[tuple[float, float, float, float], np.ndarray]:
         """Runs optimizer and subtract source."""
-
-        def get_source_snr(shiftx: float, shifty: float) -> float:
-            """Convert refined shifts in px indexes and takes source SNR."""
-            # this could be slow, hmmm
-            y_px = np.argmin(np.abs(camera.bins_sky.y - shifty))
-            x_px = np.argmin(np.abs(camera.bins_sky.x - shiftx))
-            return snr_map[y_px, x_px]
-
         try:
             shiftx, shifty, fluence = optimize(
                 camera,
@@ -634,10 +627,11 @@ def iros(
             )
         except Exception as e:
             raise RuntimeError(f"Optimization failed: {str(e)}") from e
-        snr_value = get_source_snr(shiftx, shifty)
+
+        significance = float(snr_map[*shift2pos(camera, shiftx, shifty)])
         model = model_sky(camera, shiftx, shifty, fluence)
         residual = sky - model
-        return (shiftx, shifty, fluence, snr_value), residual
+        return (shiftx, shifty, fluence, significance), residual
 
     def compute_snratios(
         skymaps: tuple[np.ndarray, np.ndarray],
@@ -647,7 +641,6 @@ def iros(
         # variance is clipped to improve numerical stability for off-axis sources,
         # which may result in very few counts.
         # TODO: improve on this only sorting matrix elements over a threshold.
-        # sorted directions are moved to a reservoir.
         snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skymaps, varmaps))
         return snrs
 
