@@ -346,7 +346,7 @@ def optimize(
         options={
             "maxiter": 10,
             "iprint": 1 if verbose else -1,
-            "ftol": 10e-5,
+            "ftol": 1e-4,
         },
     )
     # we use the best fluence value as the initial value for the next step.
@@ -378,7 +378,7 @@ def optimize(
         options={
             "maxiter": 10,
             "iprint": 1 if verbose else -1,
-            "ftol": 10e-5,
+            "ftol": 1e-4,
         },
     )
     # store the final optimized positions and fluence.
@@ -537,17 +537,11 @@ def iros(
                 return a, latest_b
         return tuple()
 
-    def init_get_arg(skies: tuple, batchsize: int = 1000) -> Callable:
+    def init_get_arg(snrs: tuple, batchsize: int = 1000) -> Callable:
         """This hides a reservoirs-batch mechanism for quickly selecting candidates,
         and initializes the data structures it relies on."""
-        # variance is clipped to improve numerical stability for off-axis sources,
-        # which may result in very few counts.
-        snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
-
         # we sort source directions by significance.
         # this is kind of costly because the sky arrays may be very large.
-        # TODO: improve on this only sorting matrix elements over a threshold.
-        # sorted directions are moved to a reservoir.
         reservoirs = [np.argsort(snr, axis=None) for snr in snrs]
 
         # integrating source intensities over aperture for all matrix elements is
@@ -600,10 +594,10 @@ def iros(
 
         return get if max(map(np.max, snrs)) > snr_threshold else lambda: None
 
-    def find_candidates(skies: tuple, max_pending=6666) -> tuple:
+    def find_candidates(snrs: tuple, max_pending=6666) -> tuple:
         """Returns candidate, compatible sources for the two cameras.
         Worst case complexity is O(n^2) but amortized costs are much smaller."""
-        get_arg = init_get_arg(skies)
+        get_arg = init_get_arg(snrs)
         pending = ([], [])
 
         while not (matches := match(pending)):
@@ -616,10 +610,19 @@ def iros(
                     stack.pop(0)
         return matches if matches else tuple()
 
-    def subtract(arg: tuple[int, int], sky: np.ndarray):
+    def subtract(arg: tuple[int, int], sky: np.ndarray, snr_map: np.ndarray,
+                 ) -> tuple[tuple[float, float, float, float], np.ndarray]:
         """Runs optimizer and subtract source."""
+
+        def get_source_snr(shiftx: float, shifty: float) -> float:
+            """Convert refined shifts in px indexes and takes source SNR."""
+            # this could be slow, hmmm
+            y_px = np.argmin(np.abs(camera.bins_sky.y - shifty))
+            x_px = np.argmin(np.abs(camera.bins_sky.x - shiftx))
+            return snr_map[y_px, x_px]
+        
         try:
-            source = optimize(
+            shiftx, shifty, fluence = optimize(
                 camera,
                 sky,
                 arg,
@@ -628,19 +631,32 @@ def iros(
             )
         except Exception as e:
             raise RuntimeError(f"Optimization failed: {str(e)}") from e
-        model = model_sky(camera, *source)
+        snr_value = get_source_snr(shiftx, shifty)
+        model = model_sky(camera, shiftx, shifty, fluence)
         residual = sky - model
-        return source, residual
+        return (shiftx, shifty, fluence, snr_value), residual
+    
+    def compute_snratios(skymaps: tuple[np.ndarray, np.ndarray],
+                         varmaps: tuple[np.ndarray, np.ndarray],
+                         ) -> tuple[np.ndarray, np.ndarray]:
+        """Computes skies SNR."""
+        # variance is clipped to improve numerical stability for off-axis sources,
+        # which may result in very few counts.
+        # TODO: improve on this only sorting matrix elements over a threshold.
+        # sorted directions are moved to a reservoir.
+        snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skymaps, varmaps))
+        return snrs
 
     detectors = tuple(count(camera, sdl.data)[0] for sdl in sdls)
     variances = tuple(variance(camera, d) for d in detectors)
     skies = tuple(decode(camera, d) for d in detectors)
     for i in range(max_iterations):
-        candidates = find_candidates(skies)
+        snrs = compute_snratios(skies, variances)
+        candidates = find_candidates(snrs)
         if not candidates:
             break
         try:
-            sources, skies = zip(*(subtract(index, sky) for index, sky in zip(candidates, skies)))
+            sources, skies = zip(*(subtract(index, sky, snr) for index, sky, snr in zip(candidates, skies, snrs)))
         except RuntimeError as e:
             warnings.warn(f"Optimizer failed at iteration {i}:\n\n{e}")
             continue
