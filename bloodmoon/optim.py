@@ -610,8 +610,11 @@ def iros(
                     stack.pop(0)
         return matches if matches else tuple()
 
-    def subtract(arg: tuple[int, int], sky: np.ndarray, snr_map: np.ndarray,
-                 ) -> tuple[tuple[float, float, float, float], np.ndarray]:
+    def subtract(
+        arg: tuple[int, int],
+        sky: np.ndarray,
+        snr_map: np.ndarray,
+    ) -> tuple[tuple[float, float, float, float], np.ndarray]:
         """Runs optimizer and subtract source."""
 
         def get_source_snr(shiftx: float, shifty: float) -> float:
@@ -620,7 +623,7 @@ def iros(
             y_px = np.argmin(np.abs(camera.bins_sky.y - shifty))
             x_px = np.argmin(np.abs(camera.bins_sky.x - shiftx))
             return snr_map[y_px, x_px]
-        
+
         try:
             shiftx, shifty, fluence = optimize(
                 camera,
@@ -635,10 +638,11 @@ def iros(
         model = model_sky(camera, shiftx, shifty, fluence)
         residual = sky - model
         return (shiftx, shifty, fluence, snr_value), residual
-    
-    def compute_snratios(skymaps: tuple[np.ndarray, np.ndarray],
-                         varmaps: tuple[np.ndarray, np.ndarray],
-                         ) -> tuple[np.ndarray, np.ndarray]:
+
+    def compute_snratios(
+        skymaps: tuple[np.ndarray, np.ndarray],
+        varmaps: tuple[np.ndarray, np.ndarray],
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Computes skies SNR."""
         # variance is clipped to improve numerical stability for off-axis sources,
         # which may result in very few counts.
