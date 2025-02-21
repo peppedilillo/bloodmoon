@@ -445,8 +445,9 @@ def iros(
 
     Yields:
         For each iteration, yields:
-            - A tuple of two (x, y, fluence) tuples, one for each camera's detected source,
-              where x,y are sky-shift coordinates in mm and fluence is source intensity
+            - A tuple of two (x, y, fluence, significance) tuples, one for each camera's
+              detected source, where x,y are sky-shift coordinates in mm, fluence is source intensity,
+               significance in standard deviations.
             - A tuple of two residual sky images after source removal, one for each camera
             Note: Results are ordered to match sdl_cam1a, sdl_cam1b order
 
