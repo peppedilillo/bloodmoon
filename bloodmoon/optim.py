@@ -629,10 +629,12 @@ def iros(
         except Exception as e:
             raise RuntimeError(f"Optimization failed: {str(e)}") from e
 
+        obs_fluence = sky.max()
         significance = float(snr_map[*shift2pos(camera, shiftx, shifty)])
         model = model_sky(camera, shiftx, shifty, fluence)
+        sub_fluence = model.max()
         residual = sky - model
-        return (shiftx, shifty, fluence, significance), residual
+        return (shiftx, shifty, fluence, significance, obs_fluence, sub_fluence), residual
 
     def compute_snratios(
         skymaps: tuple[np.ndarray, np.ndarray],
