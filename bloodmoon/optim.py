@@ -22,6 +22,7 @@ from scipy.signal import convolve
 
 from .images import _rbilinear_relative
 from .images import _shift
+from .images import argmax
 from .io import SimulationDataLoader
 from .mask import _convolution_kernel_psfy
 from .mask import _detector_footprint
@@ -629,12 +630,10 @@ def iros(
         except Exception as e:
             raise RuntimeError(f"Optimization failed: {str(e)}") from e
 
-        obs_fluence = sky.max()
-        significance = float(snr_map[*shift2pos(camera, shiftx, shifty)])
+        significance = float(snr_map[*argmax(sky)])
         model = model_sky(camera, shiftx, shifty, fluence)
-        sub_fluence = model.max()
         residual = sky - model
-        return (shiftx, shifty, fluence, significance, obs_fluence, sub_fluence), residual
+        return (shiftx, shifty, fluence, significance), residual
 
     def compute_snratios(
         skymaps: tuple[np.ndarray, np.ndarray],
