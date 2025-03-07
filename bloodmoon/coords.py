@@ -46,14 +46,14 @@ def pos2equatorial(
         - the sky-coord shifts are in [mm] wrt optical axis
         - RA is normalized to [0, 360) degree range
         - resulting RA/Dec refers to the center of the pixel
-        - negative indexes are accepted too
+        - negative indexes are allowed
     """
     def pos2shift(
         x: int,
         y: int,
     ) -> tuple[float, float]:
         """Convert px indexes to sky-coord shifts."""
-        
+
         def valid_idxs(pos: tuple[int, int]) -> bool:
             """Check sky indexes validity."""
             n, m = camera.sky_shape
