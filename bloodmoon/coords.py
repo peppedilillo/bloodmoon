@@ -19,6 +19,70 @@ from .types import BinsRectangular
 from .types import CoordEquatorial
 
 
+def pos2shift(
+    camera: CodedMaskCamera,
+    x: int,
+    y: int,
+) -> tuple[float, float]:
+    """
+    Convert sky pixel position (x, y) to sky-coordinate shifts.
+
+    Args:
+        camera (CodedMaskCamera): The camera object containing sky shape and binning information.
+        x (int): Pixel index along the x-axis.
+        y (int): Pixel index along the y-axis.
+
+    Returns:
+        A tuple containing:
+            shift_x (float): sky-coordinate in [mm] along the x-direction.
+            shift_y (float): sky-coordinate in [mm] along the y-direction.
+    
+    Raises:
+        IndexError: if indexes are out of bound for given sky.
+    
+    Notes:
+        - resulting shifts refer to the center of the pixel.
+        - negative indexes are allowed.
+    """
+    n, m = camera.sky_shape
+    if not (-n <= y < n) or not (-m <= x < m):
+        raise IndexError(f"Indexes ({y}, {x}) are out of bound for sky shape {camera.sky_shape}.")
+
+    # bins resemble sky shape
+    binsx = camera.bins_sky.x[:-1]; binsy = camera.bins_sky.y[:-1]
+    dbinx = binsx[1] - binsx[0]; dbiny = binsy[1] - binsy[0]
+    return binsx[x] + dbinx/2, binsy[y] + dbiny/2
+
+
+def pos2equatorial(
+    sdl: SimulationDataLoader,
+    camera: CodedMaskCamera,
+    y: int,
+    x: int,
+) -> CoordEquatorial:
+    """
+    Convert sky pixel position to corresponding sky-shift coordinates.
+
+    Args:
+        sdl (SimulationDataLoader): instance containing camera pointings.
+        camera (CodedMaskCamera): instance containing binning information.
+        y (int): sky pixel row.
+        x (int): sky pixel column.
+    
+    Returns:
+        CoordEquatorial containing:
+            - ra: Right ascension in degrees [0, 360].
+            - dec: Declination in degrees [-90, 90].
+    
+    Notes:
+        - the sky-coord shifts are in [mm] wrt optical axis.
+        - RA is normalized to [0, 360) degree range.
+        - resulting RA/Dec refer to the center of the pixel.
+        - negative indexes are allowed.
+    """    
+    return shift2equatorial(sdl, camera, *pos2shift(camera, x, y))
+
+
 def shift2equatorial(
     sdl: SimulationDataLoader,
     camera: CodedMaskCamera,
