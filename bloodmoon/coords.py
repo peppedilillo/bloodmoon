@@ -25,7 +25,7 @@ def pos2shift(
     y: int | float,
 ) -> tuple[float, float]:
     """
-    Convert pixel indexes (x, y) to sky-coordinate shifts.
+    Convert sky pixel position (x, y) to sky-coordinate shifts.
 
     Args:
         camera (CodedMaskCamera): The camera object containing sky shape and binning information.
@@ -42,6 +42,7 @@ def pos2shift(
     
     Notes:
         - resulting shifts refer to the center of the pixel.
+        - negative indexes are allowed.
     """
     n, m = camera.sky_shape
     if not (-n <= y < n) or not (-m <= x < m):
@@ -76,7 +77,7 @@ def pos2equatorial(
     Notes:
         - the sky-coord shifts are in [mm] wrt optical axis.
         - RA is normalized to [0, 360) degree range.
-        - resulting RA/Dec refers to the center of the pixel.
+        - resulting RA/Dec refer to the center of the pixel.
         - negative indexes are allowed.
     """    
     return shift2equatorial(sdl, camera, *pos2shift(camera, x, y))
