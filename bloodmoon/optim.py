@@ -22,7 +22,6 @@ from scipy.signal import convolve
 
 from .images import _rbilinear_relative
 from .images import _shift
-from .images import argmax
 from .io import SimulationDataLoader
 from .mask import _convolution_kernel_psfy
 from .mask import _detector_footprint
