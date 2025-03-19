@@ -12,7 +12,7 @@ The optimization handles both spatial and intensity parameters simultaneously.
 """
 
 from functools import lru_cache
-from typing import Callable, Iterable, Literal
+from typing import Callable, Iterable
 import warnings
 
 import numpy as np
@@ -421,7 +421,8 @@ def iros(
     sdl_cam1b: SimulationDataLoader,
     max_iterations: int,
     snr_threshold: float = 0.0,
-    dataset: Literal["detected", "reconstructed"] = "reconstructed",
+    vignetting: bool = True,
+    psfy: bool = True,
 ) -> Iterable:
     """Performs Iterative Removal of Sources (IROS) for dual-camera WFM observations.
 
@@ -440,8 +441,9 @@ def iros(
         max_iterations: Maximum number of source removal iterations to perform
         snr_threshold: Optional float. If provided, iteration stops when maximum
             residual SNR falls below this value. Defaults to 0. (no threshold).
-        dataset: Which dataset to analyze. Either "detected" (simulated data prior to reconstruction)
-            or "reconstructed" (position-reconstructed data). Defaults to "reconstructed"
+        vignetting: Optional bool. If `True`, the model used for optimization will simulate vignetting.
+        psfy: Optional bool. If `True`, the model used for optimization will simulate detector
+        position reconstruction effects.
 
     Yields:
         For each iteration, yields:
@@ -453,7 +455,6 @@ def iros(
 
     Raises:
         ValueError: If cameras are not oriented orthogonally (90° rotation in azimuth)
-        ValueError: If dataset argument is not "detected" or "reconstructed"
         RuntimeError: If source parameter optimization fails (with detailed error message)
 
     Notes:
@@ -499,9 +500,6 @@ def iros(
         else:
             sdls = (sdl_cam1b, sdl_cam1a)
     # fmt: on
-
-    if dataset not in ["detected", "reconstructed"]:
-        raise ValueError("Argument `dataset` must be either `detected` or `reconstructed`.")
 
     def direction_match(
         a: tuple[int, int],
@@ -623,8 +621,8 @@ def iros(
                 camera,
                 sky,
                 arg,
-                psfy=True if dataset == "reconstructed" else False,
-                vignetting=True if dataset == "reconstructed" else False,
+                vignetting=vignetting,
+                psfy=psfy,
             )
         except Exception as e:
             raise RuntimeError(f"Optimization failed: {str(e)}") from e
