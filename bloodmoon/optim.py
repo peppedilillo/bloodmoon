@@ -12,7 +12,7 @@ The optimization handles both spatial and intensity parameters simultaneously.
 """
 
 from functools import lru_cache
-from typing import Callable, Iterable, Literal
+from typing import Callable, Iterable
 import warnings
 
 import numpy as np
