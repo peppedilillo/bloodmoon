@@ -9,6 +9,7 @@ import bloodmoon as bm
 
 wfm = bm.codedmask(_path_test_mask, upscale_x=3, upscale_y=3)
 
+
 class TestShift2Pos(unittest.TestCase):
     """Test for the `shift2pos()` function in `mask.py`."""
 
@@ -29,18 +30,28 @@ class TestShift2Pos(unittest.TestCase):
 
         # test for the allowed shifts at the edges of the binning
         comb_yes = [
-            (shiftx_sx_in, shifty_up_in), (shiftx_sx_in, shifty_bm_in),
-            (shiftx_dx_in, shifty_up_in), (shiftx_dx_in, shifty_bm_in),
+            (shiftx_sx_in, shifty_up_in),
+            (shiftx_sx_in, shifty_bm_in),
+            (shiftx_dx_in, shifty_up_in),
+            (shiftx_dx_in, shifty_bm_in),
         ]
         testing = tuple(shift2pos(wfm, *shifts) for shifts in comb_yes)
 
         with self.assertRaises(ValueError):
             # test for the shifts outside the binning
             comb_no = [
-                (shiftx_sx_in, shifty_up_out), (shiftx_sx_in, shifty_bm_out), (shiftx_dx_in, shifty_up_out),
-                (shiftx_dx_in, shifty_bm_out), (shiftx_sx_out, shifty_up_in), (shiftx_dx_out, shifty_up_in),
-                (shiftx_sx_out, shifty_bm_in), (shiftx_dx_out, shifty_bm_in), (shiftx_sx_out, shifty_up_out),
-                (shiftx_sx_out, shifty_bm_out), (shiftx_dx_out, shifty_up_out), (shiftx_dx_out, shifty_bm_out),
+                (shiftx_sx_in, shifty_up_out),
+                (shiftx_sx_in, shifty_bm_out),
+                (shiftx_dx_in, shifty_up_out),
+                (shiftx_dx_in, shifty_bm_out),
+                (shiftx_sx_out, shifty_up_in),
+                (shiftx_dx_out, shifty_up_in),
+                (shiftx_sx_out, shifty_bm_in),
+                (shiftx_dx_out, shifty_bm_in),
+                (shiftx_sx_out, shifty_up_out),
+                (shiftx_sx_out, shifty_bm_out),
+                (shiftx_dx_out, shifty_up_out),
+                (shiftx_dx_out, shifty_bm_out),
             ]
             testing = tuple(shift2pos(wfm, *shifts) for shifts in comb_no)
 
@@ -57,7 +68,7 @@ class TestPos2Shift(unittest.TestCase):
         for _ in range(10000):
             y, x = (np.random.randint(0, n), np.random.randint(0, m))
             self.assertEqual((y, x), shift2pos(wfm, *pos2shift(wfm, x, y)))
-    
+
     def test_positive_and_negative_idxs(self):
         """Tests if positive and negative idxs refer to the same shifts."""
         n, m = wfm.sky_shape
@@ -77,9 +88,13 @@ class TestPos2Shift(unittest.TestCase):
         n, m = wfm.sky_shape
         with self.assertRaises(IndexError):
             out_pos = [
-                (m, n), (-m, n), (m, -n), (-m - 1, -n - 1),
+                (m, n),
+                (-m, n),
+                (m, -n),
+                (-m - 1, -n - 1),
             ]
-            for pos in out_pos: pos2shift(wfm, *pos)
+            for pos in out_pos:
+                pos2shift(wfm, *pos)
 
 
 if __name__ == "__main__":
