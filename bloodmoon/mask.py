@@ -708,8 +708,8 @@ def shift2pos(camera: CodedMaskCamera, shift_x: float, shift_y: float) -> tuple[
 
     Args:
         camera: CodedMaskCamera instance containing binning information
-        shift_x: x-coordinate in sky-shift space (mm)
-        shift_y: y-coordinate in sky-shift space (mm)
+        shift_x: x-coordinate in sky-shift space [mm]
+        shift_y: y-coordinate in sky-shift space [mm]
 
     Returns:
         Tuple of (row, column) indices in the discrete sky image grid
@@ -717,7 +717,7 @@ def shift2pos(camera: CodedMaskCamera, shift_x: float, shift_y: float) -> tuple[
     Raises:
         ValueError: If shifts are outside valid range
     """
-    def check_bounds(bins, shift):
+    def check_bounds(bins: npt.NDArray, shift: float) -> bool:
         """Checks shifts validity wrt binning."""
         return (shift >= bins[0]) and (shift <= bins[-1])
     

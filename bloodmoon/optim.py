@@ -612,8 +612,8 @@ def iros(
 
     def subtract(
         arg: tuple[int, int],
-        sky: np.ndarray,
-        snr_map: np.ndarray,
+        sky: npt.NDArray,
+        snr_map: npt.NDArray,
     ) -> tuple[tuple[float, float, float, float], np.ndarray]:
         """Runs optimizer and subtract source."""
         try:
@@ -633,8 +633,8 @@ def iros(
         return (shiftx, shifty, fluence, significance), residual
 
     def compute_snratios(
-        skymaps: tuple[np.ndarray, np.ndarray],
-        varmaps: tuple[np.ndarray, np.ndarray],
+        skymaps: tuple[npt.NDArray, npt.NDArray],
+        varmaps: tuple[npt.NDArray, npt.NDArray],
     ) -> tuple[np.ndarray, np.ndarray]:
         """Computes skies SNR."""
         # variance is clipped to improve numerical stability for off-axis sources,
