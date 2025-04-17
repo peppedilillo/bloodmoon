@@ -24,13 +24,36 @@ from .types import BinsRectangular
 from .types import UpscaleFactor
 
 
+def _enlarge(
+    m: npt.NDArray,
+    upscale_f: UpscaleFactor,
+) -> npt.NDArray:
+    """
+    Oversamples a 2D array by repeating elements along the axes.
+
+    Args:
+        m (npt.NDArray): Input 2D array.
+        upscale_f (UpscaleFactor): Upscaling factors.
+
+    Returns:
+        output (npt.NDArray): Oversampled array.
+
+    Notes:
+        - the total sum is NOT conserved.
+    """    
+    for i, f in enumerate(upscale_f[::-1]):
+        m = np.repeat(m, f, axis=i)
+    return m
+
+
 def upscale(
     data: npt.NDArray,
     upscale_y: int = 1,
     upscale_x: int = 1,
 ) -> npt.NDArray:
     """
-    Upscale a 2D array by repeating elements along each axis.
+    Upscales a 2D array by repeating elements along each axis and
+    by interpolating array values.
 
     Args:
         data (npt.NDArray): Input 2D array.
@@ -53,10 +76,58 @@ def upscale(
     ):
         raise ValueError("Upscaling factors must be positive integers.")
     
-    for i, f in enumerate((upscale_y, upscale_x)):
-        data = np.repeat(data, f, axis=i)
+    upscaling = UpscaleFactor(upscale_x, upscale_y)
+    return _enlarge(data, upscaling) / np.prod(upscaling)
+
+
+def _reduce(
+    m: npt.NDArray,
+    downscaling: npt.NDArray,
+) -> npt.NDArray:
+    """
+    Downsamples a 2D array.
+
+    Args:
+        m (npt.NDArray): Input 2D array.
+        downscaling (npt.NDArray): Downscaling factors.
+
+    Returns:
+        output (npt.NDArray): Downsampled array.
+
+    Notes:
+        - the total sum is conserved.
+    """
+    def _handle_shape(
+        data: npt.NDArray,
+        factors: npt.NDArray,
+    ) -> npt.NDArray:
+        """Adjusts array for blocks subdivision by cutting extra-rows/columns."""
+
+        def _handle_axis(a: npt.NDArray, idx: int) -> npt.NDArray:
+            """Redistributes cutted values in the block-adjusted axis."""
+            return a[:idx] + a[idx:].sum(axis=0) / idx
+        
+        adj_shape = (np.array(data.shape) // factors) * factors
+        for ax in range(data.ndim):
+            if data.shape[ax] != adj_shape[ax]:
+                data = data.swapaxes(0, ax)
+                data = _handle_axis(data, adj_shape[ax])
+                data = data.swapaxes(0, ax)
+        return data
+
+    def _to_blocks(
+        data: npt.NDArray,
+        factors: npt.NDArray,
+    ) -> npt.NDArray:
+        """Reshapes input array into blocks."""
+        assert not np.any(np.mod(data.shape, factors) != 0)
+        nblocks = np.array(data.shape) // factors
+        reshaping = tuple(dim for dims in zip(nblocks, factors) for dim in dims)
+        return data.reshape(reshaping).transpose((0, 2, 1, 3))
     
-    return data/np.prod((upscale_y, upscale_x))
+    m = _handle_shape(m, downscaling)
+    m = _to_blocks(m, downscaling)
+    return m.sum(axis=(2, 3))
 
 
 def downscale(
@@ -65,7 +136,8 @@ def downscale(
     downscale_x: int = 1,
 ) -> npt.NDArray:
     """
-    Downscale a 2D array.
+    Downscales a 2D array by dividing the input array in blocks
+    and adding over them to interpolate array values.
 
     Args:
         data (npt.NDArray): Input 2D array.
@@ -85,42 +157,15 @@ def downscale(
         - The total sum of the array is conserved.
         - For N-dim arrays, consider using `astropy.nndata.block_reduce()`.
     """
-    def _handle_shape(
-        data: npt.NDArray,
-        downscaling: npt.NDArray,
-    ) -> npt.NDArray:
-        """Adjusts array for blocks subdivision by cutting extra-rows/columns."""
-        def _handle_axis(a: npt.NDArray, idx: int) -> npt.NDArray:
-            """Redistributes cutted values in the block-adjusted axis."""
-            return a[:idx] + a[idx:].sum(axis=0) / idx
-        adj_shape = (np.array(data.shape) // downscaling) * downscaling
-        for ax in range(data.ndim):
-            if data.shape[ax] != adj_shape[ax]:
-                data = data.swapaxes(0, ax)
-                data = _handle_axis(data, adj_shape[ax])
-                data = data.swapaxes(0, ax)
-        return data
-
-    def _to_blocks(
-        data: npt.NDArray,
-        downscaling: npt.NDArray,
-    ) -> npt.NDArray:
-        """Reshapes input array into blocks."""
-        assert not np.any(np.mod(data.shape, downscaling) != 0)
-        nblocks = np.array(data.shape) // downscaling
-        reshaping = tuple(dim for dims in zip(nblocks, downscaling) for dim in dims)
-        return data.reshape(reshaping).transpose((0, 2, 1, 3))
     
     if not (
         (isinstance(downscale_y, int) and downscale_y > 0) and
         (isinstance(downscale_x, int) and downscale_x > 0)
     ):
         raise ValueError("Downscaling factors must be positive integers.")
-
+    
     downscaling = np.array((downscale_y, downscale_x))
-    data = _handle_shape(data, downscaling)
-    data = _to_blocks(data, downscaling)
-    return data.sum(axis=(2, 3))
+    return _reduce(data, downscaling)
 
 
 def compose(

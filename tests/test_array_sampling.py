@@ -66,6 +66,16 @@ class TestSampling(unittest.TestCase):
         c = upscale(b, fy, fx)
         self.assertEqual(c.shape, (n, m))                    # testing downscaled array shape
         self.assertAlmostEqual(a.sum(), c.sum(), places=5)   # testing sum conservation
+    
+    def test_factors(self):
+        """Test `upscale()` and `downscale()` input factors."""
+        a = np.ones((5, 5))
+
+        with self.assertRaises(ValueError):
+            upscale(a, -3, 1)
+            upscale(a, 3, 0)
+            downscale(a, -2, 1)
+            downscale(a, 2, -1)
 
 
 if __name__ == "__main__":

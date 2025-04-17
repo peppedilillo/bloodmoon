@@ -287,8 +287,7 @@ def encode(
     Returns:
         2D array representing detector shadowgram
     """
-    unnormalized_shadowgram = correlate(camera.mask, sky, mode="valid")
-    return unnormalized_shadowgram
+    return correlate(camera.mask, sky, mode="valid") * camera.bulk
 
 
 def variance(
