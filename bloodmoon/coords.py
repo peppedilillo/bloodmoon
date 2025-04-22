@@ -19,10 +19,12 @@ from .mask import CodedMaskCamera
 from .types import BinsEquatorial
 from .types import BinsRectangular
 from .types import CoordEquatorial
+from .types import CoordSky
 
 __all__ = [
     "shift2pos", "pos2shift", "pos2equatorial",
-    "shift2equatorial", "shiftgrid2equatorial", "_to_angles",
+    "shift2equatorial", "equatorial2shift",
+    "shiftgrid2equatorial", "_to_angles",
 ]
 
 
@@ -172,12 +174,11 @@ def _shift2equatorial(
             spatial units as midpoints_xs and midpoints_ys.
 
     Returns:
-        BinsEquatorial record containing:
-            - `dec` field: Grid of declination values in degrees, same shape as input arrays
-            - `ra` field: Grid of right ascension values in degrees, same shape as input arrays.
-              Values are in the range [0, 360] degrees.
+        CoordEquatorial containing:
+            - ra: Right ascension in degrees [0, 360]
+            - dec: Declination in degrees [-90, 90]
     """
-    rotmat_sky2cam, rotmat_cam2sky = _rotation_matrices(
+    _, rotmat_cam2sky = _rotation_matrices(
         pointing_radec_z,
         pointing_radec_x,
     )
