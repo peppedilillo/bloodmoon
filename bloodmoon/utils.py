@@ -21,8 +21,7 @@ def timer(name: str) -> Generator[None, Any, None]:
         name (str): Name of the task the timer is handling.
     
     Raises:
-        Exception: The timer raises the encoutered exception
-                   within the algorithm and prints its name.
+        Exception: Encoutered exception within the algorithm (if any).
     """
     start_time = time.perf_counter()
     error = False
