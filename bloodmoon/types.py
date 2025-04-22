@@ -4,8 +4,12 @@ Custom data types and containers for the WFM analysis pipeline.
 
 from typing import NamedTuple
 
-import numpy as np
 import numpy.typing as npt
+
+__all__ = [
+    "CoordEquatorial", "CoordHorizontal", "BinsRectangular",
+    "BinsEquatorial", "UpscaleFactor",
+]
 
 
 class CoordEquatorial(NamedTuple):

@@ -33,11 +33,17 @@ from .mask import count
 from .mask import decode
 from .mask import model_shadowgram
 from .mask import model_sky
-from .mask import shift2pos
 from .mask import snratio
 from .mask import strip
 from .mask import variance
 from .types import UpscaleFactor
+from .coords import shift2pos
+
+__all__ = [
+    "_convolution_kernel_psfy_cached", "_detector_footprint_cached",
+    "_init_model_coarse", "_init_model_fine", "_loss",
+    "optimize", "iros",
+]
 
 
 @lru_cache(maxsize=1)

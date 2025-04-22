@@ -19,6 +19,11 @@ from astropy.io.fits.header import Header
 from bloodmoon.types import CoordEquatorial
 from bloodmoon.types import CoordHorizontal
 
+__all__ = [
+    "_validate_fits", "simulation_files", "SimulationDataLoader",
+    "MaskDataLoader", "fetch_mask",
+]
+
 
 def _validate_fits(filepath: Path) -> bool:
     """Following astropy's approach, reads the first FITS card (80 bytes) and checks for

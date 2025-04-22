@@ -23,6 +23,13 @@ from scipy.interpolate import RegularGridInterpolator
 from .types import BinsRectangular
 from .types import UpscaleFactor
 
+__all__ = [
+    "upscale", "downscale", "compose",
+    "argmax", "_rbilinear", "_interp",
+    "_shift", "_erosion", "_rbilinear_relative",
+    "_unframe",
+]
+
 
 def _enlarge(
     m: npt.NDArray,

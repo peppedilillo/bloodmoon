@@ -9,6 +9,8 @@ This module provides functions to convert between different coordinate systems:
 The transformations account for the instrument geometry and pointing direction.
 """
 
+from bisect import bisect
+
 import numpy as np
 import numpy.typing as npt
 
@@ -17,6 +19,38 @@ from .mask import CodedMaskCamera
 from .types import BinsEquatorial
 from .types import BinsRectangular
 from .types import CoordEquatorial
+
+__all__ = [
+    "shift2pos", "pos2shift", "pos2equatorial",
+    "shift2equatorial", "shiftgrid2equatorial", "_to_angles",
+]
+
+
+def shift2pos(camera: CodedMaskCamera, shift_x: float, shift_y: float) -> tuple[int, int]:
+    """
+    Convert continuous sky-shift coordinates to nearest discrete pixel indices.
+
+    Args:
+        camera: CodedMaskCamera instance containing binning information
+        shift_x: x-coordinate in sky-shift space [mm]
+        shift_y: y-coordinate in sky-shift space [mm]
+
+    Returns:
+        Tuple of (row, column) indices in the discrete sky image grid
+
+    Raises:
+        ValueError: If shifts are outside valid range
+    """
+    def check_bounds(bins: npt.NDArray, shift: float) -> bool:
+        """Checks shifts validity wrt binning."""
+        return (shift >= bins[0]) and (shift <= bins[-1])
+    
+    if not (
+        check_bounds(camera.bins_sky.y, shift_y) and check_bounds(camera.bins_sky.x, shift_x)
+    ):
+        raise ValueError("Shifts outside binning boundaries.")
+    
+    return bisect(camera.bins_sky.y, shift_y) - 1, bisect(camera.bins_sky.x, shift_x) - 1
 
 
 def pos2shift(
