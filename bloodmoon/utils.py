@@ -23,9 +23,15 @@ def timer(name: str) -> Generator[None, Any, None]:
     Raises:
         Exception: Encoutered exception within the algorithm (if any).
     """
+    def handle_time(start: float, end: float) -> str:
+        """Handles output time format."""
+        time_interval = end - start
+        h, rem = divmod(time_interval, 3600)
+        m, s = divmod(rem, 60)
+        return f"{int(h):02}h:{int(m):02}m:{s:.3f}s"
+
     start_time = time.perf_counter()
     error = False
-
     print(f"    # Starting '{name}' at {datetime.now():%H:%M:%S}.")
     try:
         yield
@@ -34,7 +40,8 @@ def timer(name: str) -> Generator[None, Any, None]:
         raise
     finally:
         end_time = time.perf_counter()
-        mess = f"    # Finished '{name}' in {end_time - start_time:.3f}s"
+        elapsed_time = handle_time(start_time, end_time)
+        mess = f"    # Finished '{name}' in {elapsed_time}"
         print(mess + ".\n" if not error else mess + f" with {error}.\n")
 
 
