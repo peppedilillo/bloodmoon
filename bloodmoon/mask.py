@@ -31,7 +31,7 @@ from .images import _rbilinear_relative
 from .images import _shift
 from .images import _unframe
 from .images import argmax
-from .images import upscale
+from .images import _enlarge
 from .io import MaskDataLoader
 from .types import BinsRectangular
 from .types import UpscaleFactor
@@ -200,12 +200,12 @@ class CodedMaskCamera:
     @cached_property
     def mask(self) -> npt.NDArray:
         """2D array representing the coded mask pattern."""
-        return upscale(_fold(self.mdl.mask, self._bins_mask(UpscaleFactor(1, 1))).astype(int), *self.upscale_f)
+        return _enlarge(_fold(self.mdl.mask, self._bins_mask(UpscaleFactor(1, 1))).astype(int), self.upscale_f)
 
     @cached_property
     def decoder(self) -> npt.NDArray:
         """2D array representing the mask pattern used for decoding."""
-        return upscale(_fold(self.mdl.decoder, self._bins_mask(UpscaleFactor(1, 1))), *self.upscale_f)
+        return _enlarge(_fold(self.mdl.decoder, self._bins_mask(UpscaleFactor(1, 1))), self.upscale_f)
 
     @cached_property
     def bulk(self) -> npt.NDArray:
@@ -215,7 +215,7 @@ class CodedMaskCamera:
         bins = self._bins_mask(self.upscale_f)
         xmin, xmax = _bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
         ymin, ymax = _bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
-        return upscale(framed_bulk, *self.upscale_f)[ymin:ymax, xmin:xmax]
+        return _enlarge(framed_bulk, self.upscale_f)[ymin:ymax, xmin:xmax]
 
     @cached_property
     def balancing(self) -> npt.NDArray:
@@ -611,11 +611,11 @@ def apply_vignetting(
     """
     bins = camera.bins_detector
 
-    angle_x_rad = abs(np.arctan(shift_x / camera.mdl["mask_detector_distance"]))
+    angle_x_rad = abs(np.arctan(shift_x / camera.mdl["detector_topmask_dist"]))
     red_factor = camera.mdl["mask_thickness"] * np.tan(angle_x_rad)
     sg1 = _erosion(shadowgram, bins.x[1] - bins.x[0], red_factor)
 
-    angle_y_rad = abs(np.arctan(shift_y / camera.mdl["mask_detector_distance"]))
+    angle_y_rad = abs(np.arctan(shift_y / camera.mdl["detector_topmask_dist"]))
     red_factor = camera.mdl["mask_thickness"] * np.tan(angle_y_rad)
     sg2 = _erosion(shadowgram.T, bins.y[1] - bins.y[0], red_factor)
     return sg1 * sg2.T

@@ -22,8 +22,8 @@ from .types import CoordEquatorial
 from .types import CoordSky
 
 __all__ = [
-    "shift2pos", "pos2shift", "pos2equatorial",
-    "shift2equatorial", "equatorial2shift",
+    "shift2pos", "pos2shift", "shift2theta", "theta2shift",
+    "pos2equatorial", "shift2equatorial", "equatorial2shift",
     "shiftgrid2equatorial", "_to_angles",
 ]
 
@@ -90,6 +90,41 @@ def pos2shift(
     return binsx[x] + dbinx/2, binsy[y] + dbiny/2
 
 
+def shift2theta(camera: CodedMaskCamera, shift: float) -> float:
+    """
+    Convert sky-coordinate shift in respective angular coordinate.
+
+    Args:
+        camera (CodedMaskCamera): The camera object containing the WFM cameras parameters.
+        shift (float): Sky-coordinate shift.
+    
+    Returns:
+        theta (float): Angular sky-coordinate in [deg].
+    
+    Notes:
+        - `shift` must have same physical dimension of mask-detector distance, i.e. [mm].
+        - the distance to compute `theta` is assumed to be mask-detector plus half the mask thickness.
+    """
+    return np.rad2deg(np.arctan(shift / camera.specs["detector_midmask_dist"]))
+
+
+def theta2shift(camera: CodedMaskCamera, theta: float) -> float:
+    """
+    Convert angular sky-coordinate in respective shift coordinate.
+
+    Args:
+        camera (CodedMaskCamera): The camera object containing the WFM cameras parameters.
+        theta (float): Angular sky-coordinate in [deg].
+    
+    Returns:
+        shift (float): Sky-coordinate shift in [mm].
+    
+    Notes:
+        - the distance to compute `theta` is assumed to be mask-detector plus half the mask thickness.
+    """
+    return camera.specs["detector_midmask_dist"] * np.tan(np.deg2rad(theta))
+
+
 def pos2equatorial(
     sdl: SimulationDataLoader,
     camera: CodedMaskCamera,
@@ -148,7 +183,7 @@ def shift2equatorial(
         shift_y,
         sdl.pointings["z"],
         sdl.pointings["x"],
-        camera.specs["mask_detector_distance"],
+        camera.specs["detector_midmask_dist"],
     )
 
 
@@ -223,7 +258,7 @@ def equatorial2shift(
         dec,
         sdl.pointings["z"],
         sdl.pointings["x"],
-        camera.specs["mask_detector_distance"],
+        camera.specs["detector_midmask_dist"],
     )
 
 
@@ -383,7 +418,7 @@ def shiftgrid2equatorial(
         *np.meshgrid(shift_xs, shift_ys),
         sdl.pointings["z"],
         sdl.pointings["x"],
-        camera.specs["mask_detector_distance"],
+        camera.specs["detector_midmask_dist"],
     )
 
 

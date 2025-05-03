@@ -24,9 +24,10 @@ from .types import BinsRectangular
 from .types import UpscaleFactor
 
 __all__ = [
-    "upscale", "downscale", "compose",
-    "argmax", "_rbilinear", "_interp",
-    "_shift", "_erosion", "_rbilinear_relative",
+    "_enlarge", "upscale", "_reduce",
+    "downscale", "compose", "argmax",
+    "_rbilinear", "_interp", "_shift",
+    "_erosion", "_rbilinear_relative",
     "_unframe",
 ]
 
