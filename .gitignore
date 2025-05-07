@@ -165,5 +165,6 @@ cython_debug/
 
 **/.DS_Store
 notebooks/
+demo/simdir
 demo/wfm_mask.fits
 repomix-output.txt
