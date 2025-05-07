@@ -7,9 +7,7 @@ from bloodmoon.images import _erosion
 
 class TestErosion(unittest.TestCase):
     def setUp(self):
-        self.assertArrayAlmostEqual = lambda x, y: np.testing.assert_array_almost_equal(
-            x, y, decimal=2
-        )
+        self.assertArrayAlmostEqual = lambda x, y: np.testing.assert_array_almost_equal(x, y, decimal=2)
 
     def test_basic_erosion_1(self):
         arr = np.array(

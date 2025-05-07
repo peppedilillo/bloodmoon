@@ -7,9 +7,7 @@ from bloodmoon.images import _rbilinear
 
 
 class TestAntibilinear(unittest.TestCase):
-    def assertWeightsEqual(
-        self, actual: Dict[Tuple[int, int], float], expected: np.ndarray
-    ):
+    def assertWeightsEqual(self, actual: Dict[Tuple[int, int], float], expected: np.ndarray):
         result = np.zeros(expected.shape)
         for (i, j), weight in actual.items():
             result[i, j] = weight

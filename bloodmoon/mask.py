@@ -69,9 +69,7 @@ def _fold(
     Returns:
         2D array containing binned mask data
     """
-    return binned_statistic_2d(
-        ml["X"], ml["Y"], ml["VAL"], statistic="max", bins=[mask_bins.x, mask_bins.y]
-    )[0].T
+    return binned_statistic_2d(ml["X"], ml["Y"], ml["VAL"], statistic="max", bins=[mask_bins.x, mask_bins.y])[0].T
 
 
 def _bisect_interval(
@@ -102,9 +100,7 @@ def _bisect_interval(
         - To improve performance the function will not check for array monotonicity.
     """
     if not (start >= a[0] and stop <= a[-1]):
-        raise ValueError(
-            f"Interval ({start:+.2f}, {stop:+.2f}) out bounds input array ({a[0]:+.2f}, {a[-1]:+.2f})"
-        )
+        raise ValueError(f"Interval ({start:+.2f}, {stop:+.2f}) out bounds input array ({a[0]:+.2f}, {a[-1]:+.2f})")
     return bisect_right(a, start) - 1, bisect_left(a, stop)
 
 
@@ -184,15 +180,9 @@ class CodedMaskCamera:
            detector_min   detector_max
         """
         bins = self._bins_mask(self.upscale_f)
-        xmin, xmax = _bisect_interval(
-            bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"]
-        )
-        ymin, ymax = _bisect_interval(
-            bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"]
-        )
-        return BinsRectangular(
-            self.bins_mask.x[xmin : xmax + 1], self.bins_mask.y[ymin : ymax + 1]
-        )
+        xmin, xmax = _bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
+        ymin, ymax = _bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
+        return BinsRectangular(self.bins_mask.x[xmin : xmax + 1], self.bins_mask.y[ymin : ymax + 1])
 
     @cached_property
     def bins_detector(self) -> BinsRectangular:
@@ -258,12 +248,8 @@ class CodedMaskCamera:
         framed_bulk = _fold(self.mdl.bulk, self._bins_mask(UpscaleFactor(1, 1)))
         framed_bulk[~np.isclose(framed_bulk, np.zeros_like(framed_bulk))] = 1
         bins = self._bins_mask(self.upscale_f)
-        xmin, xmax = _bisect_interval(
-            bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"]
-        )
-        ymin, ymax = _bisect_interval(
-            bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"]
-        )
+        xmin, xmax = _bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
+        ymin, ymax = _bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
         return upscale(framed_bulk, *self.upscale_f)[ymin:ymax, xmin:xmax]
 
     @cached_property
@@ -274,32 +260,18 @@ class CodedMaskCamera:
     @cached_property
     def detector_shape(self) -> tuple[int, int]:
         """Shape of the detector array (rows, columns)."""
-        xmin = np.floor(
-            self.mdl["detector_minx"] / (self.mdl["mask_deltax"] / self.upscale_f.x)
-        )
-        xmax = np.ceil(
-            self.mdl["detector_maxx"] / (self.mdl["mask_deltax"] / self.upscale_f.x)
-        )
-        ymin = np.floor(
-            self.mdl["detector_miny"] / (self.mdl["mask_deltay"] / self.upscale_f.y)
-        )
-        ymax = np.ceil(
-            self.mdl["detector_maxy"] / (self.mdl["mask_deltay"] / self.upscale_f.y)
-        )
+        xmin = np.floor(self.mdl["detector_minx"] / (self.mdl["mask_deltax"] / self.upscale_f.x))
+        xmax = np.ceil(self.mdl["detector_maxx"] / (self.mdl["mask_deltax"] / self.upscale_f.x))
+        ymin = np.floor(self.mdl["detector_miny"] / (self.mdl["mask_deltay"] / self.upscale_f.y))
+        ymax = np.ceil(self.mdl["detector_maxy"] / (self.mdl["mask_deltay"] / self.upscale_f.y))
         return int(ymax - ymin), int(xmax - xmin)
 
     @cached_property
     def mask_shape(self) -> tuple[int, int]:
         """Shape of the mask array (rows, columns)."""
         return (
-            int(
-                (self.mdl["mask_maxy"] - self.mdl["mask_miny"])
-                / (self.mdl["mask_deltay"] / self.upscale_f.y)
-            ),
-            int(
-                (self.mdl["mask_maxx"] - self.mdl["mask_minx"])
-                / (self.mdl["mask_deltax"] / self.upscale_f.x)
-            ),
+            int((self.mdl["mask_maxy"] - self.mdl["mask_miny"]) / (self.mdl["mask_deltay"] / self.upscale_f.y)),
+            int((self.mdl["mask_maxx"] - self.mdl["mask_minx"]) / (self.mdl["mask_deltax"] / self.upscale_f.x)),
         )
 
     @cached_property
@@ -341,10 +313,7 @@ def codedmask(
     ):
         raise ValueError("Detector plane is larger than mask.")
 
-    if not (
-        (isinstance(upscale_x, int) and upscale_x > 0)
-        and (isinstance(upscale_y, int) and upscale_y > 0)
-    ):
+    if not ((isinstance(upscale_x, int) and upscale_x > 0) and (isinstance(upscale_y, int) and upscale_y > 0)):
         raise ValueError("Upscale factors must be positive integers.")
 
     return CodedMaskCamera(mdl, UpscaleFactor(x=upscale_x, y=upscale_y))
@@ -403,11 +372,7 @@ def variance(
     cc = correlate(camera.decoder, detector, mode="full")
     var = correlate(np.square(camera.decoder), detector, mode="full")
     sum_det, sum_bulk = map(np.sum, (detector, camera.bulk))
-    var_bal = (
-        var
-        + np.square(camera.balancing) * sum_det / np.square(sum_bulk)
-        - 2 * cc * camera.balancing / sum_bulk
-    )
+    var_bal = var + np.square(camera.balancing) * sum_det / np.square(sum_bulk) - 2 * cc * camera.balancing / sum_bulk
     return var_bal
 
 
@@ -467,12 +432,8 @@ def _detector_footprint(camera: CodedMaskCamera) -> tuple[int, int, int, int]:
     """Shadowgram helper function."""
     bins_detector = camera.bins_detector
     bins_mask = camera.bins_mask
-    i_min, i_max = _bisect_interval(
-        bins_mask.y, bins_detector.y[0], bins_detector.y[-1]
-    )
-    j_min, j_max = _bisect_interval(
-        bins_mask.x, bins_detector.x[0], bins_detector.x[-1]
-    )
+    i_min, i_max = _bisect_interval(bins_mask.y, bins_detector.y[0], bins_detector.y[-1])
+    j_min, j_max = _bisect_interval(bins_mask.x, bins_detector.x[0], bins_detector.x[-1])
     return i_min, i_max, j_min, j_max
 
 
@@ -489,9 +450,7 @@ def _packing_factor(camera: CodedMaskCamera) -> tuple[float, float]:
     """
     rows_notnull = camera.mask[np.any(camera.mask != 0, axis=1), :]
     cols_notnull = camera.mask[:, np.any(camera.mask != 0, axis=0)]
-    pack_x, pack_y = np.mean(np.mean(rows_notnull, axis=1)), np.mean(
-        np.mean(cols_notnull, axis=0)
-    )
+    pack_x, pack_y = np.mean(np.mean(rows_notnull, axis=1)), np.mean(np.mean(cols_notnull, axis=0))
     return float(pack_x), float(pack_y)
 
 
@@ -651,9 +610,7 @@ def _convolution_kernel_psfy(camera: CodedMaskCamera) -> npt.NDArray:
         A column array convolution kernel.
     """
     bins = camera.bins_detector
-    min_bin, max_bin = _bisect_interval(
-        bins.y, -camera.mdl["slit_deltay"], camera.mdl["slit_deltay"]
-    )
+    min_bin, max_bin = _bisect_interval(bins.y, -camera.mdl["slit_deltay"], camera.mdl["slit_deltay"])
     bin_edges = bins.y[min_bin : max_bin + 1]
     midpoints = (bin_edges[1:] + bin_edges[:-1]) / 2
     kernel = psfy_wfm(midpoints).reshape(len(midpoints), -1)
@@ -741,30 +698,15 @@ def model_shadowgram(
 
     n, m = camera.sky_shape
     i_min, i_max, j_min, j_max = _detector_footprint(camera)
-    _mask = (
-        apply_vignetting(camera, camera.mask, shift_x, shift_y)
-        if vignetting
-        else camera.mask
-    )
-    _mask = (
-        convolve(_mask, _convolution_kernel_psfy(camera), mode="same")
-        if psfy
-        else _mask
-    )
-    components, (pivot_i, pivot_j) = _rbilinear_relative(
-        shift_x, shift_y, camera.bins_sky.x, camera.bins_sky.y
-    )
+    _mask = apply_vignetting(camera, camera.mask, shift_x, shift_y) if vignetting else camera.mask
+    _mask = convolve(_mask, _convolution_kernel_psfy(camera), mode="same") if psfy else _mask
+    components, (pivot_i, pivot_j) = _rbilinear_relative(shift_x, shift_y, camera.bins_sky.x, camera.bins_sky.y)
     r, c = (n // 2 - pivot_i), (m // 2 - pivot_j)
     mask_shifted_processed = _shift(_mask, (r, c))
 
-    framed_shadowgram = mask_shifted_processed[
-        i_min - 1 : i_max + 1, j_min - 1 : j_max + 1
-    ]
+    framed_shadowgram = mask_shifted_processed[i_min - 1 : i_max + 1, j_min - 1 : j_max + 1]
     model = (
-        sum(
-            framed_shadowgram[RCMAP[pos_i], RCMAP[pos_j]] * weight
-            for (pos_i, pos_j), weight in components.items()
-        )
+        sum(framed_shadowgram[RCMAP[pos_i], RCMAP[pos_j]] * weight for (pos_i, pos_j), weight in components.items())
         * camera.bulk
     )
     model /= np.sum(model)
@@ -803,14 +745,10 @@ def model_sky(
     Notes:
         - For optimization, consider using the dedicated, cached function of `optim.py`
     """
-    return decode(
-        camera, model_shadowgram(camera, shift_x, shift_y, fluence, vignetting, psfy)
-    )
+    return decode(camera, model_shadowgram(camera, shift_x, shift_y, fluence, vignetting, psfy))
 
 
-def shift2pos(
-    camera: CodedMaskCamera, shift_x: float, shift_y: float
-) -> tuple[int, int]:
+def shift2pos(camera: CodedMaskCamera, shift_x: float, shift_y: float) -> tuple[int, int]:
     """
     Convert continuous sky-shift coordinates to nearest discrete pixel indices.
 
@@ -830,10 +768,7 @@ def shift2pos(
         """Checks shifts validity wrt binning."""
         return (shift >= bins[0]) and (shift <= bins[-1])
 
-    if not (
-        check_bounds(camera.bins_sky.y, shift_y)
-        and check_bounds(camera.bins_sky.x, shift_x)
-    ):
+    if not (check_bounds(camera.bins_sky.y, shift_y) and check_bounds(camera.bins_sky.x, shift_x)):
         raise ValueError("Shifts outside binning boundaries.")
 
     return (

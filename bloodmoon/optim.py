@@ -119,9 +119,7 @@ def _init_model_coarse(
             # print("cache hit")
             return cache_get() * fluence
         # print("cache miss")
-        sg = model_shadowgram(
-            camera, shift_x, shift_y, 1, vignetting=vignetting, psfy=psfy
-        )
+        sg = model_shadowgram(camera, shift_x, shift_y, 1, vignetting=vignetting, psfy=psfy)
         cache_set((shift_x, shift_y), decode(camera, sg))
         return cache_get() * fluence
 
@@ -194,9 +192,7 @@ def _init_model_fine(
 
     def normalized_component(framed_shadowgram, relative_position):
         pos_i, pos_j = relative_position
-        return (
-            s := framed_shadowgram[RCMAP[pos_i], RCMAP[pos_j]] * camera.bulk
-        ) / np.sum(s)
+        return (s := framed_shadowgram[RCMAP[pos_i], RCMAP[pos_j]] * camera.bulk) / np.sum(s)
 
     def f(shift_x: float, shift_y: float, fluence: float) -> npt.NDArray:
         """
@@ -216,9 +212,7 @@ def _init_model_fine(
             - Caches individual spatial components
             - Suitable for source position optimization
         """
-        components, pivot = _rbilinear_relative(
-            shift_x, shift_y, camera.bins_sky.x, camera.bins_sky.y
-        )
+        components, pivot = _rbilinear_relative(shift_x, shift_y, camera.bins_sky.x, camera.bins_sky.y)
         relative_positions = tuple(components.keys())
         if cached((pivot, *relative_positions)):
             decoded_components = cache_get((pivot, *relative_positions))
@@ -229,29 +223,20 @@ def _init_model_fine(
             r, c = (n // 2 - pivot_i), (m // 2 - pivot_j)
 
             # we call with pivot because calling with shifts to ensure consistent cached/vignetting combos
-            mask_processed = process_mask(
-                camera.bins_sky.x[pivot_j], camera.bins_sky.y[pivot_i]
-            )
+            mask_processed = process_mask(camera.bins_sky.x[pivot_j], camera.bins_sky.y[pivot_i])
             mask_shifted_processed = _shift(mask_processed, (r, c))
-            framed_shadowgram = mask_shifted_processed[
-                i_min - 1 : i_max + 1, j_min - 1 : j_max + 1
-            ]
+            framed_shadowgram = mask_shifted_processed[i_min - 1 : i_max + 1, j_min - 1 : j_max + 1]
 
             # this makes me suffer, there should be a way to not compute decode four times..
             # TODO: is it possible to obtain the same behaviour without four decodings?
             decoded_components = tuple(
                 map(
                     lambda x: decode(camera, x),
-                    (
-                        normalized_component(framed_shadowgram, rpos)
-                        for rpos in relative_positions
-                    ),
+                    (normalized_component(framed_shadowgram, rpos) for rpos in relative_positions),
                 )
             )
             cache_set((pivot, *relative_positions), decoded_components)
-        sky_model = sum(
-            dc * w for dc, w in zip(decoded_components, components.values())
-        )
+        sky_model = sum(dc * w for dc, w in zip(decoded_components, components.values()))
         return sky_model * fluence
 
     return f, cache_clear
@@ -295,9 +280,7 @@ def _loss(model_f: Callable) -> Callable:
         """
         shift_x, shift_y, fluence = args
         model = model_f(*args)
-        (min_i, max_i, min_j, max_j), _ = chop(
-            camera, shift2pos(camera, shift_x, shift_y)
-        )
+        (min_i, max_i, min_j, max_j), _ = chop(camera, shift2pos(camera, shift_x, shift_y))
         truth_chopped = truth[min_i:max_i, min_j:max_j]
         model_chopped = model[min_i:max_i, min_j:max_j]
         residual = truth_chopped - model_chopped
@@ -344,18 +327,14 @@ def optimize(
         - Bounds are set based on initial guess and physical constraints
     """
     # TODO: the upscaling factor should probably go into a configuration thing.
-    shift_start_x, shift_start_y = _interpmax(
-        camera, arg_sky, sky, UpscaleFactor(10, 10)
-    )
+    shift_start_x, shift_start_y = _interpmax(camera, arg_sky, sky, UpscaleFactor(10, 10))
     fluence_start = sky.max()
 
     # initialize the function to compute coarse, fluence-dependent shadowgram model.
     # to reduce the number of cross-correlation the function is cached. it is our
     # responsibility to clear cache, freeing memory, after we will be done with the
     # the coarse fluence step.
-    _compute_model_coarse, _compute_model_coarse_cache_clear = _init_model_coarse(
-        camera, vignetting, psfy
-    )
+    _compute_model_coarse, _compute_model_coarse_cache_clear = _init_model_coarse(camera, vignetting, psfy)
     loss_coarse = _loss(_compute_model_coarse)
     results = minimize(
         lambda args: loss_coarse((shift_start_x, shift_start_y, args[0]), sky, camera),
@@ -379,9 +358,7 @@ def optimize(
     # this is slower to compute and requires more memory. again it leverages caches to reduce
     # the number of cross-correlation computations, and it is our responsibility to free
     # memory after we will be done.
-    _compute_model_fine, _compute_model_fine_cache_clear = _init_model_fine(
-        camera, vignetting, psfy
-    )
+    _compute_model_fine, _compute_model_fine_cache_clear = _init_model_fine(camera, vignetting, psfy)
     loss_fine = _loss(_compute_model_fine)
     results = minimize(
         lambda args: loss_fine((args[0], args[1], args[2]), sky, camera),
@@ -389,20 +366,12 @@ def optimize(
         method="L-BFGS-B",
         bounds=[
             (
-                max(
-                    shift_start_x - camera.mdl["slit_deltax"] / 2, camera.bins_sky.x[0]
-                ),
-                min(
-                    shift_start_x + camera.mdl["slit_deltax"] / 2, camera.bins_sky.x[-1]
-                ),
+                max(shift_start_x - camera.mdl["slit_deltax"] / 2, camera.bins_sky.x[0]),
+                min(shift_start_x + camera.mdl["slit_deltax"] / 2, camera.bins_sky.x[-1]),
             ),
             (
-                max(
-                    shift_start_y - camera.mdl["slit_deltay"] / 2, camera.bins_sky.y[0]
-                ),
-                min(
-                    shift_start_y + camera.mdl["slit_deltay"] / 2, camera.bins_sky.y[-1]
-                ),
+                max(shift_start_y - camera.mdl["slit_deltay"] / 2, camera.bins_sky.y[0]),
+                min(shift_start_y + camera.mdl["slit_deltay"] / 2, camera.bins_sky.y[-1]),
             ),
             (0.95 * coarse_fluence, 1.05 * coarse_fluence),
         ],
@@ -598,9 +567,7 @@ def iros(
             """Fill the batches with sorted candidates"""
             for i, _ in enumerate(sdls):
                 tail, head = reservoirs[i][:-batchsize], reservoirs[i][-batchsize:]
-                batches[i] = np.array(
-                    [np.unravel_index(id, snrs[i].shape) for id in head]
-                )
+                batches[i] = np.array([np.unravel_index(id, snrs[i].shape) for id in head])
                 reservoirs[i] = tail
 
             # integrates over mask element aperture and sum between cameras
@@ -674,10 +641,7 @@ def iros(
         # variance is clipped to improve numerical stability for off-axis sources,
         # which may result in very few counts.
         # TODO: improve on this only sorting matrix elements over a threshold.
-        snrs = tuple(
-            snratio(sky, np.clip(var_, a_min=1, a_max=None))
-            for sky, var_ in zip(skymaps, varmaps)
-        )
+        snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skymaps, varmaps))
         return snrs
 
     detectors = tuple(count(camera, sdl.data)[0] for sdl in sdls)
@@ -689,17 +653,8 @@ def iros(
         if not candidates:
             break
         try:
-            sources, skies = zip(
-                *(
-                    subtract(index, sky, snr)
-                    for index, sky, snr in zip(candidates, skies, snrs)
-                )
-            )
+            sources, skies = zip(*(subtract(index, sky, snr) for index, sky, snr in zip(candidates, skies, snrs)))
         except RuntimeError as e:
             warnings.warn(f"Optimizer failed at iteration {i}:\n\n{e}")
             continue
-        yield (
-            (sources, skies)
-            if sdls == (sdl_cam1a, sdl_cam1b)
-            else (sources[::-1], skies)
-        )
+        yield ((sources, skies) if sdls == (sdl_cam1a, sdl_cam1b) else (sources[::-1], skies))

@@ -46,9 +46,7 @@ def pos2shift(
     """
     n, m = camera.sky_shape
     if not (-n <= y < n) or not (-m <= x < m):
-        raise IndexError(
-            f"Indexes ({y}, {x}) are out of bound for sky shape {camera.sky_shape}."
-        )
+        raise IndexError(f"Indexes ({y}, {x}) are out of bound for sky shape {camera.sky_shape}.")
 
     # bins resemble sky shape
     binsx = camera.bins_sky.x[:-1]
@@ -151,11 +149,7 @@ def _shift2equatorial(
         pointing_radec_z,
         pointing_radec_x,
     )
-    r = np.sqrt(
-        shift_x * shift_x
-        + shift_y * shift_y
-        + distance_detector_mask * distance_detector_mask
-    )
+    r = np.sqrt(shift_x * shift_x + shift_y * shift_y + distance_detector_mask * distance_detector_mask)
     _v = np.array([shift_x, shift_y, distance_detector_mask]) / r
     vx, vy, vz = np.matmul(rotmat_cam2sky, _v)
     # the versors above are in the rectangular coordinates, we transform into angles
@@ -211,14 +205,10 @@ def _rotation_matrices(
     phi_x = np.deg2rad(ra_x)
 
     sin_theta_x = np.sin(theta_x)
-    x_axis = np.array(
-        [sin_theta_x * np.cos(phi_x), sin_theta_x * np.sin(phi_x), np.cos(theta_x)]
-    )
+    x_axis = np.array([sin_theta_x * np.cos(phi_x), sin_theta_x * np.sin(phi_x), np.cos(theta_x)])
 
     sin_theta_z = np.sin(theta_z)
-    z_axis = np.array(
-        [sin_theta_z * np.cos(phi_z), sin_theta_z * np.sin(phi_z), np.cos(theta_z)]
-    )
+    z_axis = np.array([sin_theta_z * np.cos(phi_z), sin_theta_z * np.sin(phi_z), np.cos(theta_z)])
 
     y_axis = np.array(
         [
