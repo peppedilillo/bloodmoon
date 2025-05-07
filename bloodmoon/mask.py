@@ -156,14 +156,25 @@ class CodedMaskCamera:
         return self._bins_mask(self.upscale_f)
 
     def _bins_detector(self, upscale_f: UpscaleFactor) -> BinsRectangular:
-        """Generate binning structure for detector with given upscale factors."""
+        """Generate binning structure for detector with given upscale factors.
+        The detector bins are aligned to the mask bins.
+        To guarantee this, we may need to extend the detector bin a bit over the mask.
+
+         ◀────────────mask────────────▶
+         │    │    │    │    │    │    │
+         └────┴────┴────┴────┴────┴────┘
+        -3   -2   -1    0    +1   +2   +3
+              ┌─┬──┬────┬────┬──┬─┐
+              │    │    │    │    │
+                │               │
+                ◀───detector────▶
+                │               │
+           detector_min   detector_max
+        """
         bins = self._bins_mask(self.upscale_f)
         xmin, xmax = _bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
         ymin, ymax = _bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
-        return BinsRectangular(
-            _bin(bins.x[xmin], bins.x[xmax], self.mdl["mask_deltax"] / upscale_f.x),
-            _bin(bins.y[ymin], bins.y[ymax], self.mdl["mask_deltay"] / upscale_f.y),
-        )
+        return BinsRectangular(self.bins_mask.x[xmin:xmax + 1], self.bins_mask.y[ymin:ymax + 1])
 
     @cached_property
     def bins_detector(self) -> BinsRectangular:
@@ -171,12 +182,27 @@ class CodedMaskCamera:
         return self._bins_detector(self.upscale_f)
 
     def _bins_sky(self, upscale_f: UpscaleFactor) -> BinsRectangular:
-        """Binning structure for the reconstructed sky image."""
+        """Binning structure for the reconstructed sky image.
+
+        While the mask and detector bins are aligned, the sky-bins are not.
+
+            │    │    │    │    │    │    │
+            ◀────┴────┴──mask───┴────┴───▶┘
+            0    1    2    3    4    5    6
+
+                      │    │    │
+                      ◀───det───▶
+                      0    1    2
+
+         │    │    │    │     │    │    │    │
+         ◀────┴────┴────┴─sky─┴────┴────┴────▶
+         0    1    2    3     4    5    6    7
+        """
         binsd, binsm = self._bins_detector(upscale_f), self._bins_mask(upscale_f)
         xstep, ystep = binsm.x[1] - binsm.x[0], binsm.y[1] - binsm.y[0]
         return BinsRectangular(
-            np.linspace(binsd.x[0] + binsm.x[0] + xstep, binsd.x[-1] + binsm.x[-1], self.sky_shape[1] + 1),
-            np.linspace(binsd.y[0] + binsm.y[0] + ystep, binsd.y[-1] + binsm.y[-1], self.sky_shape[0] + 1),
+            np.linspace(binsd.x[0] + binsm.x[0] + xstep / 2, binsd.x[-1] + binsm.x[-1] - xstep / 2, self.sky_shape[1] + 1),
+            np.linspace(binsd.y[0] + binsm.y[0] + ystep / 2, binsd.y[-1] + binsm.y[-1] - ystep / 2, self.sky_shape[0] + 1),
         )
 
     @cached_property
@@ -202,7 +228,7 @@ class CodedMaskCamera:
         bins = self._bins_mask(self.upscale_f)
         xmin, xmax = _bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
         ymin, ymax = _bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
-        return upscale(framed_bulk, *self.upscale_f)[ymin:ymax, xmin:xmax]
+        return upscale(framed_bulk, *self.upscale_f)[ymin: ymax, xmin:xmax]
 
     @cached_property
     def balancing(self) -> npt.NDArray:
@@ -288,6 +314,26 @@ def encode(
     return unnormalized_shadowgram
 
 
+def decode(
+    camera: CodedMaskCamera,
+    detector: npt.NDArray,
+) -> npt.NDArray:
+    """Reconstruct balanced sky image from detector counts using cross-correlation.
+
+    Args:
+        camera: CodedMaskCamera object containing mask and decoder patterns
+        detector: 2D array of detector counts
+
+    Returns:
+        Balanced cross-correlation sky image
+            - Variance map of the reconstructed sky image
+    """
+    cc = correlate(camera.decoder, detector, mode="full")
+    sum_det, sum_bulk = map(np.sum, (detector, camera.bulk))
+    cc_bal = cc - camera.balancing * sum_det / sum_bulk
+    return cc_bal
+
+
 def variance(
     camera: CodedMaskCamera,
     detector: npt.NDArray,
@@ -328,26 +374,6 @@ def snratio(
     variance_clipped = np.clip(var, a_min=0.0, a_max=None) if np.any(var < 0) else var
     variance_unframed = _unframe(variance_clipped, value=np.inf)
     return sky / np.sqrt(variance_unframed)
-
-
-def decode(
-    camera: CodedMaskCamera,
-    detector: npt.NDArray,
-) -> npt.NDArray:
-    """Reconstruct balanced sky image from detector counts using cross-correlation.
-
-    Args:
-        camera: CodedMaskCamera object containing mask and decoder patterns
-        detector: 2D array of detector counts
-
-    Returns:
-        Balanced cross-correlation sky image
-            - Variance map of the reconstructed sky image
-    """
-    cc = correlate(camera.decoder, detector, mode="full")
-    sum_det, sum_bulk = map(np.sum, (detector, camera.bulk))
-    cc_bal = cc - camera.balancing * sum_det / sum_bulk
-    return cc_bal
 
 
 def psf(camera: CodedMaskCamera) -> npt.NDArray:
@@ -500,6 +526,7 @@ def _interpmax(
     return float(bins_fine.x[max_tile_j]), float(bins_fine.y[max_tile_i])
 
 
+# todo: move these to a configuration file rather than having them hardcoded here
 _PSFX_WFM_PARAMS = {
     "center": 0,
     "alpha": 0.0016,

@@ -225,7 +225,7 @@ def _init_model_fine(
             # we call with pivot because calling with shifts to ensure consistent cached/vignetting combos
             mask_processed = process_mask(camera.bins_sky.x[pivot_j], camera.bins_sky.y[pivot_i])
             mask_shifted_processed = _shift(mask_processed, (r, c))
-            framed_shadowgram = mask_shifted_processed[i_min - 1 : i_max + 1, j_min - 1 : j_max + 1]
+            framed_shadowgram = mask_shifted_processed[i_min - 1:i_max + 1, j_min - 1:j_max + 1]
 
             # this makes me suffer, there should be a way to not compute decode four times..
             # TODO: is it possible to obtain the same behaviour without four decodings?

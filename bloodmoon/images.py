@@ -274,7 +274,8 @@ def _rbilinear(
     if i == 0 or j == 0 or i == len(bins_y) - 2 or j == len(bins_x) - 2:
         return OrderedDict([((i, j), 1.0)])
 
-    deltax, deltay = cx - bins_x[j], cy - bins_y[i]
+    mx, my = (bins_x[j] + bins_x[j + 1]) / 2, (bins_y[i] + bins_y[i + 1]) / 2
+    deltax, deltay = cx - mx, cy - my
     a = (i, j)
     b = (i, j + 1) if deltax > 0 else (i, j - 1)
     c = (i + 1, j) if deltay > 0 else (i - 1, j)

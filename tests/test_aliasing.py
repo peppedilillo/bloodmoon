@@ -27,7 +27,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = _rbilinear(2., 3., bins_x, bins_y)
+        weights = _rbilinear(2.5, 3.5, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_off_center_point_top(self):
@@ -44,7 +44,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = _rbilinear(2., 2.5, bins_x, bins_y)
+        weights = _rbilinear(2.5, 3.0, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_off_center_point_bottom(self):
@@ -61,7 +61,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = _rbilinear(2.0, 3.5, bins_x, bins_y)
+        weights = _rbilinear(2.5, 4.0, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_off_center_point_right(self):
@@ -78,7 +78,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = _rbilinear(2.5, 3.0, bins_x, bins_y)
+        weights = _rbilinear(3.0, 3.5, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_off_center_point_left(self):
@@ -95,7 +95,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = _rbilinear(1.5, 3., bins_x, bins_y)
+        weights = _rbilinear(2.0, 3.5, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_grid_corner(self):
@@ -112,7 +112,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = _rbilinear(1.5, 1.5, bins_x, bins_y)
+        weights = _rbilinear(2.0, 2.0, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_corner_topleft(self):
@@ -129,7 +129,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = _rbilinear(0., 0., bins_x, bins_y)
+        weights = _rbilinear(0.1, 0.1, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_corner_topright(self):
@@ -146,7 +146,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = _rbilinear(4.0, 0.00, bins_x, bins_y)
+        weights = _rbilinear(4.99, 0.01, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_corner_botright(self):
@@ -197,7 +197,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 1.0, 0.0, 0.0, 0.0],
             ]
         )
-        weights = _rbilinear(1., 6.99, bins_x, bins_y)
+        weights = _rbilinear(1.5, 6.99, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_right_side(self):
@@ -252,8 +252,8 @@ class TestAntibilinear(unittest.TestCase):
         self.assertWeightsEqual(weights, expected)
 
     def test_small_bin_steps(self):
-        bins_x = np.linspace(0, 2.5, 5 + 1)
-        bins_y = np.linspace(0, 4., 8 + 1)
+        bins_x = np.linspace(0, 2.5, 6)
+        bins_y = np.linspace(0, 3.5, 8)
         expected = np.array(
             [
                 [0.0, 0.0, 0.0, 0.0, 0.0],
@@ -263,10 +263,10 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
                 [0.0, 0.0, 0.0, 0.0, 0.0],
                 [0.0, 0.0, 0.0, 0.0, 0.0],
-                [0.0, 0.0, 0.0, 0.0, 0.0],
+
             ]
         )
-        weights = _rbilinear(0.75, 0.75, bins_x, bins_y)
+        weights = _rbilinear(1.0, 1.0, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
     def test_invalid_grid(self):
