@@ -60,7 +60,9 @@ def simulation_files(dirpath: str | Path) -> dict[str, dict[str, Path]]:
     def check_and_pick(parent: Path, pattern: str) -> Path:
         matches = tuple(parent.glob(pattern))
         if not matches:
-            raise ValueError(f"A file matching the pattern {str(parent / pattern)} is expected but missing.")
+            raise ValueError(
+                f"A file matching the pattern {str(parent / pattern)} is expected but missing."
+            )
         f, *extra_matches = matches
         if extra_matches:
             raise ValueError(
@@ -143,8 +145,12 @@ class SimulationDataLoader:
             z and x axes.
         """
         return {
-            "z": CoordHorizontal(az=self.header["CAMZPH"], al=90 - self.header["CAMZTH"]),
-            "x": CoordHorizontal(az=self.header["CAMXPH"], al=90 - self.header["CAMXTH"]),
+            "z": CoordHorizontal(
+                az=self.header["CAMZPH"], al=90 - self.header["CAMZTH"]
+            ),
+            "x": CoordHorizontal(
+                az=self.header["CAMXPH"], al=90 - self.header["CAMXTH"]
+            ),
         }
 
 
@@ -198,7 +204,9 @@ class MaskDataLoader:
         Returns:
             Dictionary of mask parameters (dimensions, bounds, distances) as float values
         """
-        h1 = dict(fits.getheader(self.filepath, ext=0)) | dict(fits.getheader(self.filepath, ext=2))
+        h1 = dict(fits.getheader(self.filepath, ext=0)) | dict(
+            fits.getheader(self.filepath, ext=2)
+        )
         h2 = dict(fits.getheader(self.filepath, ext=3))
 
         info = {

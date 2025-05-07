@@ -7,8 +7,22 @@ from bloodmoon.images import _unframe
 
 class TestUnframe(unittest.TestCase):
     def test_basic(self):
-        arr = np.array([[0.0, 1.0, 0.0, 0.0], [0.0, 1.0, 2.0, 0.0], [0.0, 3.0, 4.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
-        expected = np.array([[0.0, 0.0, 0.0, 0.0], [0.0, 1.0, 2.0, 0.0], [0.0, 3.0, 4.0, 0.0], [0.0, 0.0, 0.0, 0.0]])
+        arr = np.array(
+            [
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 1.0, 2.0, 0.0],
+                [0.0, 3.0, 4.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ]
+        )
+        expected = np.array(
+            [
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 2.0, 0.0],
+                [0.0, 3.0, 4.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+            ]
+        )
         np.testing.assert_array_equal(_unframe(arr), expected)
 
     def test_basic2(self):

@@ -42,7 +42,10 @@ def upscale(
     Raises:
         ValueError: for invalid upscale factors (everything but positive integers).
     """
-    if not ((isinstance(upscale_x, int) and upscale_x > 0) and (isinstance(upscale_y, int) and upscale_y > 0)):
+    if not (
+        (isinstance(upscale_x, int) and upscale_x > 0)
+        and (isinstance(upscale_y, int) and upscale_y > 0)
+    ):
         raise ValueError("Upscale factors must be positive integers.")
 
     # VERY careful here, the next is not a typo.
@@ -134,7 +137,9 @@ def compose(
     # if matrices have odd rows and even columns composition is ambiguous
     if maxd % 2 != mind % 2:
         if strict:
-            raise ValueError("Input matrices must have rows and columns with same parity if `strict` is True")
+            raise ValueError(
+                "Input matrices must have rows and columns with same parity if `strict` is True"
+            )
         if maxd == a.shape[1]:
             a = a[:, :-1]
             b = b[:, :-1]
@@ -155,7 +160,9 @@ def compose(
     def _rotb2b(i, j):
         return mind - 1 - j, i
 
-    def f(i: int, j: int) -> tuple[Optional[tuple[int, int]], Optional[tuple[int, int]]]:
+    def f(
+        i: int, j: int
+    ) -> tuple[Optional[tuple[int, int]], Optional[tuple[int, int]]]:
         """
         Given a couple of indeces of the recombined image, returns two couples of
         indeces, one for the `a` matrix, and one for the `b` matrix.
@@ -310,11 +317,17 @@ def _rbilinear_relative(
     bins_y: npt.NDArray,
 ) -> tuple[OrderedDict, tuple[int, int]]:
     """To avoid computing shifts many time, we create a slightly shadowgram and index over it.
-    This operation requires the results for rbilinear to be expressed relatively to the pivot."""
+    This operation requires the results for rbilinear to be expressed relatively to the pivot.
+    """
     results_rbilinear = _rbilinear(cx, cy, bins_x, bins_y)
     ((pivot_i, pivot_j), _), *__ = results_rbilinear.items()
     # noinspection PyTypeChecker
-    return OrderedDict([((k_i - pivot_i, k_j - pivot_j), w) for (k_i, k_j), w in results_rbilinear.items()]), (
+    return OrderedDict(
+        [
+            ((k_i - pivot_i, k_j - pivot_j), w)
+            for (k_i, k_j), w in results_rbilinear.items()
+        ]
+    ), (
         pivot_i,
         pivot_j,
     )
@@ -356,8 +369,12 @@ def _interp(
 
     midpoints_x = (bins.x[1:] + bins.x[:-1]) / 2
     midpoints_y = (bins.y[1:] + bins.y[:-1]) / 2
-    midpoints_x_fine = np.linspace(midpoints_x[0], midpoints_x[-1], len(midpoints_x) * interp_f.x + 1)
-    midpoints_y_fine = np.linspace(midpoints_y[0], midpoints_y[-1], len(midpoints_y) * interp_f.y + 1)
+    midpoints_x_fine = np.linspace(
+        midpoints_x[0], midpoints_x[-1], len(midpoints_x) * interp_f.x + 1
+    )
+    midpoints_y_fine = np.linspace(
+        midpoints_y[0], midpoints_y[-1], len(midpoints_y) * interp_f.y + 1
+    )
     interp = RegularGridInterpolator(
         (midpoints_x, midpoints_y),
         tile.T,
@@ -399,9 +416,14 @@ def _shift(
     if abs(shift_i) >= n or abs(shift_j) >= m:
         # won't load into memory 66666666 x 66666666 bullshit matrix
         return np.zeros_like(a)
-    vpadded = np.pad(a, ((0 if shift_i < 0 else shift_i, 0 if shift_i >= 0 else -shift_i), (0, 0)))
+    vpadded = np.pad(
+        a, ((0 if shift_i < 0 else shift_i, 0 if shift_i >= 0 else -shift_i), (0, 0))
+    )
     vpadded = vpadded[:n, :] if shift_i > 0 else vpadded[-n:, :]
-    hpadded = np.pad(vpadded, ((0, 0), (0 if shift_j < 0 else shift_j, 0 if shift_j >= 0 else -shift_j)))
+    hpadded = np.pad(
+        vpadded,
+        ((0, 0), (0 if shift_j < 0 else shift_j, 0 if shift_j >= 0 else -shift_j)),
+    )
     hpadded = hpadded[:, :m] if shift_j > 0 else hpadded[:, -m:]
     return hpadded
 

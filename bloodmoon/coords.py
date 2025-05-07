@@ -36,22 +36,26 @@ def pos2shift(
         A tuple containing:
             shift_x: X coordinate in sky-shift space (mm)
             shift_y: Y coordinate in sky-shift space (mm)
-    
+
     Raises:
         IndexError: if indexes are out of bound for given sky.
-    
+
     Notes:
         - resulting shifts refer to the center of the pixel.
         - negative indexes are allowed.
     """
     n, m = camera.sky_shape
     if not (-n <= y < n) or not (-m <= x < m):
-        raise IndexError(f"Indexes ({y}, {x}) are out of bound for sky shape {camera.sky_shape}.")
+        raise IndexError(
+            f"Indexes ({y}, {x}) are out of bound for sky shape {camera.sky_shape}."
+        )
 
     # bins resemble sky shape
-    binsx = camera.bins_sky.x[:-1]; binsy = camera.bins_sky.y[:-1]
-    dbinx = binsx[1] - binsx[0]; dbiny = binsy[1] - binsy[0]
-    return binsx[x] + dbinx/2, binsy[y] + dbiny/2
+    binsx = camera.bins_sky.x[:-1]
+    binsy = camera.bins_sky.y[:-1]
+    dbinx = binsx[1] - binsx[0]
+    dbiny = binsy[1] - binsy[0]
+    return binsx[x] + dbinx / 2, binsy[y] + dbiny / 2
 
 
 def pos2equatorial(
@@ -68,18 +72,18 @@ def pos2equatorial(
         camera: A CodedMaskCamera object containing sky shape and binning information.
         x: Pixel index along the x-axis. integer.
         y: Pixel index along the y-axis. integer.
-    
+
     Returns:
         CoordEquatorial containing:
             - ra: Right ascension in degrees [0, 360].
             - dec: Declination in degrees [-90, 90].
-    
+
     Notes:
         - the sky-coord shifts are in [mm] wrt optical axis.
         - RA is normalized to [0, 360) degree range.
         - resulting RA/Dec refer to the center of the pixel.
         - negative indexes are allowed.
-    """    
+    """
     return shift2equatorial(sdl, camera, *pos2shift(camera, x, y))
 
 
@@ -147,7 +151,11 @@ def _shift2equatorial(
         pointing_radec_z,
         pointing_radec_x,
     )
-    r = np.sqrt(shift_x * shift_x + shift_y * shift_y + distance_detector_mask * distance_detector_mask)
+    r = np.sqrt(
+        shift_x * shift_x
+        + shift_y * shift_y
+        + distance_detector_mask * distance_detector_mask
+    )
     _v = np.array([shift_x, shift_y, distance_detector_mask]) / r
     vx, vy, vz = np.matmul(rotmat_cam2sky, _v)
     # the versors above are in the rectangular coordinates, we transform into angles
@@ -203,10 +211,14 @@ def _rotation_matrices(
     phi_x = np.deg2rad(ra_x)
 
     sin_theta_x = np.sin(theta_x)
-    x_axis = np.array([sin_theta_x * np.cos(phi_x), sin_theta_x * np.sin(phi_x), np.cos(theta_x)])
+    x_axis = np.array(
+        [sin_theta_x * np.cos(phi_x), sin_theta_x * np.sin(phi_x), np.cos(theta_x)]
+    )
 
     sin_theta_z = np.sin(theta_z)
-    z_axis = np.array([sin_theta_z * np.cos(phi_z), sin_theta_z * np.sin(phi_z), np.cos(theta_z)])
+    z_axis = np.array(
+        [sin_theta_z * np.cos(phi_z), sin_theta_z * np.sin(phi_z), np.cos(theta_z)]
+    )
 
     y_axis = np.array(
         [
