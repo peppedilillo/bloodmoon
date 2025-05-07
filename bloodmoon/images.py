@@ -224,8 +224,8 @@ def _rbilinear(
     Y coordinates are supposed to grow top to bottom.
     X coordinates grow left to right.
 
-    The basic idea is to identify for poles and assign weights to it.
-    The more the center is close to a pole, the more weight the pole gets.
+    The basic idea is to identify four poles and to assign them weights.
+    The more the center is close to a pole, the more weight it gets.
 
            │            │            │
      ──────┼────────────┼────────────┼──────
@@ -266,19 +266,15 @@ def _rbilinear(
         raise ValueError("Grid boundaries must have at least 2 points")
     if not (np.all(np.diff(bins_x) > 0) and np.all(np.diff(bins_y) > 0)):
         raise ValueError("Grid bins must be strictly increasing")
-    if not (bins_x[0] < cx < bins_x[-1] and bins_y[0] < cy < bins_y[-1]):
+    if not (bins_x[0] <= cx <= bins_x[-1] and bins_y[0] <= cy <= bins_y[-1]):
         raise ValueError("Center lies outside grid.")
 
     i, j = (bisect(bins_y, cy) - 1), bisect(bins_x, cx) - 1
+    # this will take care of the pivots when it is falss on the border
     if i == 0 or j == 0 or i == len(bins_y) - 2 or j == len(bins_x) - 2:
-        return OrderedDict(
-            [
-                ((i, j), 1.0),
-            ]
-        )
+        return OrderedDict([((i, j), 1.0)])
 
-    mx, my = (bins_x[j] + bins_x[j + 1]) / 2, (bins_y[i] + bins_y[i + 1]) / 2
-    deltax, deltay = cx - mx, cy - my
+    deltax, deltay = cx - bins_x[j], cy - bins_y[i]
     a = (i, j)
     b = (i, j + 1) if deltax > 0 else (i, j - 1)
     c = (i + 1, j) if deltay > 0 else (i - 1, j)
@@ -304,6 +300,23 @@ def _rbilinear(
     )
     total = sum(weights.values())
     return OrderedDict([(k, v / total) for k, v in weights.items()])
+
+
+def _rbilinear_relative(
+    cx: float,
+    cy: float,
+    bins_x: npt.NDArray,
+    bins_y: npt.NDArray,
+) -> tuple[OrderedDict, tuple[int, int]]:
+    """To avoid computing shifts many time, we create a slightly shadowgram and index over it.
+    This operation requires the results for rbilinear to be expressed relatively to the pivot."""
+    results_rbilinear = _rbilinear(cx, cy, bins_x, bins_y)
+    ((pivot_i, pivot_j), _), *__ = results_rbilinear.items()
+    # noinspection PyTypeChecker
+    return OrderedDict([((k_i - pivot_i, k_j - pivot_j), w) for (k_i, k_j), w in results_rbilinear.items()]), (
+        pivot_i,
+        pivot_j,
+    )
 
 
 def _interp(
@@ -468,23 +481,6 @@ def _erosion(
         (1 - decimal) * cborder_mask - arr_ * cborder_mask
     )
     # fmt: on
-
-
-def _rbilinear_relative(
-    cx: float,
-    cy: float,
-    bins_x: npt.NDArray,
-    bins_y: npt.NDArray,
-) -> tuple[OrderedDict, tuple[int, int]]:
-    """To avoid computing shifts many time, we create a slightly shadowgram and index over it.
-    This operation requires the results for rbilinear to be expressed relatively to the pivot."""
-    results_rbilinear = _rbilinear(cx, cy, bins_x, bins_y)
-    ((pivot_i, pivot_j), _), *__ = results_rbilinear.items()
-    # noinspection PyTypeChecker
-    return OrderedDict([((k_i - pivot_i, k_j - pivot_j), w) for (k_i, k_j), w in results_rbilinear.items()]), (
-        pivot_i,
-        pivot_j,
-    )
 
 
 def _unframe(a: npt.NDArray, value: float = 0.0) -> npt.NDArray:

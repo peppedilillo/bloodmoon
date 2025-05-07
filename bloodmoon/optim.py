@@ -146,6 +146,8 @@ def _init_model_fine(
         Two callables. The first is the routine for computing the model, the second
         is a routine for freeing the cache.
     """
+    # this dictionary maps an offset (see _rbilinear_relative) to a slice.
+    # these slices are used to select the correct piece of mask projection.
     RCMAP = {
         0: slice(1, -1),
         +1: slice(2, None),
@@ -213,10 +215,8 @@ def _init_model_fine(
         components, pivot = _rbilinear_relative(shift_x, shift_y, camera.bins_sky.x, camera.bins_sky.y)
         relative_positions = tuple(components.keys())
         if cached((pivot, *relative_positions)):
-            # print("cache hit")
             decoded_components = cache_get((pivot, *relative_positions))
         else:
-            # print("no cache hit")
             n, m = camera.sky_shape
             pivot_i, pivot_j = pivot
             i_min, i_max, j_min, j_max = _detector_footprint_cached(camera)

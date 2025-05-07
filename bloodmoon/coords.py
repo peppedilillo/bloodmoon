@@ -28,14 +28,14 @@ def pos2shift(
     Convert sky pixel position (x, y) to sky-coordinate shifts.
 
     Args:
-        camera (CodedMaskCamera): The camera object containing sky shape and binning information.
-        x (int): Pixel index along the x-axis.
-        y (int): Pixel index along the y-axis.
+        camera: A CodedMaskCamera object containing sky shape and binning information.
+        x: Pixel index along the x-axis. integer.
+        y: Pixel index along the y-axis. integer.
 
     Returns:
         A tuple containing:
-            shift_x (float): sky-coordinate in [mm] along the x-direction.
-            shift_y (float): sky-coordinate in [mm] along the y-direction.
+            shift_x: X coordinate in sky-shift space (mm)
+            shift_y: Y coordinate in sky-shift space (mm)
     
     Raises:
         IndexError: if indexes are out of bound for given sky.
@@ -64,10 +64,10 @@ def pos2equatorial(
     Convert sky pixel position to corresponding sky-shift coordinates.
 
     Args:
-        sdl (SimulationDataLoader): instance containing camera pointings.
-        camera (CodedMaskCamera): instance containing binning information.
-        y (int): sky pixel row.
-        x (int): sky pixel column.
+        sdl: SimulationDataLoader containing camera pointings
+        camera: A CodedMaskCamera object containing sky shape and binning information.
+        x: Pixel index along the x-axis. integer.
+        y: Pixel index along the y-axis. integer.
     
     Returns:
         CoordEquatorial containing:

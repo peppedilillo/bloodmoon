@@ -173,10 +173,7 @@ class CodedMaskCamera:
     def _bins_sky(self, upscale_f: UpscaleFactor) -> BinsRectangular:
         """Binning structure for the reconstructed sky image."""
         binsd, binsm = self._bins_detector(upscale_f), self._bins_mask(upscale_f)
-        xstep, ystep = (
-            binsm.x[1] - binsm.x[0],
-            binsm.y[1] - binsm.y[0],
-        )
+        xstep, ystep = binsm.x[1] - binsm.x[0], binsm.y[1] - binsm.y[0]
         return BinsRectangular(
             np.linspace(binsd.x[0] + binsm.x[0] + xstep, binsd.x[-1] + binsm.x[-1], self.sky_shape[1] + 1),
             np.linspace(binsd.y[0] + binsm.y[0] + ystep, binsd.y[-1] + binsm.y[-1], self.sky_shape[0] + 1),
