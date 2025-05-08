@@ -64,14 +64,14 @@ class TestPos2Shift(unittest.TestCase):
         Tests if computed shifts through `pos2shift()` refer to the
         same pixel indexes obtained with `shift2pos()`.
         """
-        n, m = wfm.sky_shape
+        n, m = wfm.shape_sky
         for _ in range(10000):
             y, x = (np.random.randint(0, n), np.random.randint(0, m))
             self.assertEqual((y, x), shift2pos(wfm, *pos2shift(wfm, x, y)))
 
     def test_positive_and_negative_idxs(self):
         """Tests if positive and negative idxs refer to the same shifts."""
-        n, m = wfm.sky_shape
+        n, m = wfm.shape_sky
         in_pos = [
             ((m - 1, n - 1), (-1, -1)),
             ((3 * m // 4, n - 1), (-m // 4, -1)),
@@ -85,7 +85,7 @@ class TestPos2Shift(unittest.TestCase):
 
     def test_idxs_boundaries(self):
         """Test for out-of-bound elements."""
-        n, m = wfm.sky_shape
+        n, m = wfm.shape_sky
         with self.assertRaises(IndexError):
             out_pos = [
                 (m, n),

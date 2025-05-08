@@ -44,9 +44,9 @@ def pos2shift(
         - resulting shifts refer to the center of the pixel.
         - negative indexes are allowed.
     """
-    n, m = camera.sky_shape
+    n, m = camera.shape_sky
     if not (-n <= y < n) or not (-m <= x < m):
-        raise IndexError(f"Indexes ({y}, {x}) are out of bound for sky shape {camera.sky_shape}.")
+        raise IndexError(f"Indexes ({y}, {x}) are out of bound for sky shape {camera.shape_sky}.")
 
     # bins resemble sky shape
     binsx = camera.bins_sky.x[:-1]
