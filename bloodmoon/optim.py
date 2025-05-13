@@ -634,7 +634,7 @@ def iros(
             raise RuntimeError(f"Optimization failed: {str(e)}") from e
 
         significance = float(snr_map[*shift2pos(camera, shiftx, shifty)])
-        model = model_sky(camera, shiftx, shifty, fluence)
+        model = model_sky(camera, shiftx, shifty, fluence, vignetting, psfy)
         residual = sky - model
         return (shiftx, shifty, fluence, significance), residual
 

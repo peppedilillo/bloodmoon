@@ -519,8 +519,8 @@ _PSFX_WFM_PARAMS = {
 }
 _PSFY_WFM_PARAMS = {
     "center": 0,
-    "alpha": 0.2592,
-    "beta": 0.5972,
+    "alpha": 0.3214,
+    "beta": 0.6246,
 }
 
 
