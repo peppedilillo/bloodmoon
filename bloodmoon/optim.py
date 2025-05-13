@@ -624,9 +624,9 @@ def iros(
         """Runs optimizer and subtract source."""
         try:
             shiftx, shifty, fluence = optimize(
-                camera,
-                sky,
-                arg,
+                camera=camera,
+                sky=sky,
+                arg_sky=arg,
                 vignetting=vignetting,
                 psfy=psfy,
             )
@@ -634,7 +634,14 @@ def iros(
             raise RuntimeError(f"Optimization failed: {str(e)}") from e
 
         significance = float(snr_map[*shift2pos(camera, shiftx, shifty)])
-        model = model_sky(camera, shiftx, shifty, fluence, vignetting, psfy)
+        model = model_sky(
+            camera=camera,
+            shift_x=shiftx,
+            shift_y=shifty,
+            fluence=fluence,
+            vignetting=vignetting,
+            psfy=psfy,
+        )
         residual = sky - model
         return (shiftx, shifty, fluence, significance), residual
 
