@@ -161,7 +161,7 @@ def simulation(filepath: str | Path) -> SimulationDataLoader:
         filepath: path to FITS file.
 
     Returns:
-        a MaskDataLoader dataclass.
+        a SimulationDataLoader dataclass.
     """
     dr = Path(filepath)
     if not dr.is_file():
