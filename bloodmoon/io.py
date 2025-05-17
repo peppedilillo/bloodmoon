@@ -20,14 +20,16 @@ from bloodmoon.types import CoordEquatorial
 from bloodmoon.types import CoordHorizontal
 
 __all__ = [
-    "_validate_fits", "simulation_files", "SimulationDataLoader",
+    "_validate_fits", "check_fits",
+    "simulation_files", "SimulationDataLoader",
     "MaskDataLoader", "fetch_mask",
 ]
 
 
 def _validate_fits(filepath: Path) -> bool:
-    """Following astropy's approach, reads the first FITS card (80 bytes) and checks for
-    the SIMPLE keyword signature.
+    """
+    Following astropy's approach, reads the first FITS card (80 bytes)
+    and checks for the SIMPLE keyword signature.
 
     Args:
         filepath: Path object pointing to the file to validate
@@ -48,6 +50,27 @@ def _validate_fits(filepath: Path) -> bool:
 
     match_sig = simple[:29] == fits_signature[:-1] and simple[29:30] in (b"T", b"F")
     return match_sig
+
+
+def check_fits(filepath: Path) -> bool:
+    """
+    Check presence and validity of the FITS file.
+
+    Args:
+        filepath (str | Path): Path to the FITS file.
+    
+    Returns:
+        output (bool): True if FITS exists and in valid format.
+
+    Raises:
+        FileNotFoundError: If FITS file does not exist.
+        ValueError: If file not in valid FITS format.
+    """
+    if not filepath.is_file():
+        raise FileNotFoundError(f"FITS file '{filepath}' does not exist.")
+    elif not _validate_fits(filepath):
+        raise ValueError("File not in valid FITS format.")
+    return True
 
 
 def simulation_files(dirpath: str | Path) -> dict[str, dict[str, Path]]:
@@ -163,12 +186,9 @@ def simulation(filepath: str | Path) -> SimulationDataLoader:
     Returns:
         a SimulationDataLoader dataclass.
     """
-    dr = Path(filepath)
-    if not dr.is_file():
-        raise FileNotFoundError(f"The simulation file {dr.name} does not exists.")
-    if not _validate_fits(filepath):
-        raise ValueError("File not in valid FITS format.")
-    return SimulationDataLoader(filepath)
+    if check_fits(Path(filepath)):
+        sdl = SimulationDataLoader(filepath)
+    return sdl
 
 
 @dataclass(frozen=True)
@@ -293,12 +313,9 @@ def fetch_mask(filepath: str | Path) -> MaskDataLoader:
     Returns:
         a MaskDataLoader dataclass.
     """
-    fp = Path(filepath)
-    if not fp.is_file():
-        raise FileNotFoundError("Mask file does not exists")
-    if not _validate_fits(filepath):
-        raise ValueError("File not in valid FITS format.")
-    return MaskDataLoader(Path(filepath))
+    if check_fits(Path(filepath)):
+        mdl = MaskDataLoader(Path(filepath))
+    return mdl
 
 
 """
