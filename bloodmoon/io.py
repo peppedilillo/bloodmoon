@@ -126,7 +126,6 @@ class SimulationDataLoader:
     Properties:
         data: Photon event data from FITS extension 1
         header: Primary FITS header
-        mask_detector_distance (float): Distance between mask and detector in mm
         pointings (dict[str, CoordEquatorial]): Camera axis directions in equatorial frame
             - 'z': Optical axis pointing (RA/Dec)
             - 'x': Camera x-axis pointing (RA/Dec)
