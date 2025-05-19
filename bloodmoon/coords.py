@@ -48,18 +48,22 @@ def shift2pos(camera: CodedMaskCamera, shift_x: float, shift_y: float) -> tuple[
         return (shift >= bins[0]) and (shift <= bins[-1])
     
     if not (
-        check_bounds(camera.bins_sky.y, shift_y) and check_bounds(camera.bins_sky.x, shift_x)
+        check_bounds(camera.bins_sky.y, shift_y) and
+        check_bounds(camera.bins_sky.x, shift_x)
     ):
         raise ValueError("Shifts outside binning boundaries.")
     
-    return bisect(camera.bins_sky.y, shift_y) - 1, bisect(camera.bins_sky.x, shift_x) - 1
+    return (
+        bisect(camera.bins_sky.y, shift_y) - 1,
+        bisect(camera.bins_sky.x, shift_x) - 1,
+    )
 
 
 def pos2shift(
     camera: CodedMaskCamera,
     x: int,
     y: int,
-) -> tuple[float, float]:
+) -> CoordSky:
     """
     Convert sky pixel position (x, y) to sky-coordinate shifts.
 
@@ -69,9 +73,9 @@ def pos2shift(
         y (int): Pixel index along the y-axis.
 
     Returns:
-        A tuple containing:
-            shift_x (float): sky-coordinate in [mm] along the x-direction.
-            shift_y (float): sky-coordinate in [mm] along the y-direction.
+        output (CoordSky): Output sky-shifts
+            - shift_x (float): sky-coordinate in [mm] along the x-direction.
+            - shift_y (float): sky-coordinate in [mm] along the y-direction.
     
     Raises:
         IndexError: if indexes are out of bound for given sky.
@@ -80,14 +84,14 @@ def pos2shift(
         - resulting shifts refer to the center of the pixel.
         - negative indexes are allowed.
     """
-    n, m = camera.sky_shape
+    n, m = camera.shape_sky
     if not (-n <= y < n) or not (-m <= x < m):
-        raise IndexError(f"Indexes ({y}, {x}) are out of bound for sky shape {camera.sky_shape}.")
+        raise IndexError(f"Indexes ({y}, {x}) are out of bound for sky shape {camera.shape_sky}.")
 
     # bins resemble sky shape
-    binsx = camera.bins_sky.x[:-1]; binsy = camera.bins_sky.y[:-1]
-    dbinx = binsx[1] - binsx[0]; dbiny = binsy[1] - binsy[0]
-    return binsx[x] + dbinx/2, binsy[y] + dbiny/2
+    binsx = camera.bins_sky.x
+    binsy = camera.bins_sky.y
+    return CoordSky(x=binsx[x], y=binsy[y])
 
 
 def shift2theta(camera: CodedMaskCamera, shift: float) -> float:

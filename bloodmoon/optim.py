@@ -223,7 +223,7 @@ def _init_model_fine(
             decoded_components = cache_get((pivot, *relative_positions))
         else:
             # print("no cache hit")
-            n, m = camera.sky_shape
+            n, m = camera.shape_sky
             pivot_i, pivot_j = pivot
             i_min, i_max, j_min, j_max = _detector_footprint_cached(camera)
             r, c = (n // 2 - pivot_i), (m // 2 - pivot_j)
