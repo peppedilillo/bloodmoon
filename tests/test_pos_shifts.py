@@ -1,11 +1,10 @@
 import unittest
 import numpy as np
 
-import bloodmoon as bm
-from bloodmoon.assets import _path_test_mask
-from bloodmoon.coords import shift2pos, pos2shift
+import mbloodmoon as bm
+from mbloodmoon.coords import shift2pos, pos2shift
 
-
+_path_test_mask = "/home/edoardo/Datadisk/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Simulations/wfm_mask.fits"
 wfm = bm.codedmask(_path_test_mask, upscale_x=3, upscale_y=3)
 
 

@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from bloodmoon.images import _erosion
+from mbloodmoon.images import _erosion
 
 
 class TestErosion(unittest.TestCase):

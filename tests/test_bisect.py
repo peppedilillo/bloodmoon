@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from bloodmoon.mask import _bisect_interval
+from mbloodmoon.mask import _bisect_interval
 
 
 class TestBisectInterval(unittest.TestCase):

@@ -91,7 +91,7 @@ def pos2shift(
     # bins resemble sky shape
     binsx = camera.bins_sky.x
     binsy = camera.bins_sky.y
-    return CoordSky(x=binsx[x], y=binsy[y])
+    return CoordSky(binsx[x], binsy[y])
 
 
 def shift2theta(camera: CodedMaskCamera, shift: float) -> float:

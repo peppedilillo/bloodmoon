@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from bloodmoon.images import upscale, downscale
+from mbloodmoon.images import upscale, downscale
 
 
 class TestSampling(unittest.TestCase):
