@@ -2,13 +2,13 @@ import unittest
 
 import numpy as np
 
-from mbloodmoon.mask import codedmask
-from mbloodmoon.mask import decode
-from mbloodmoon.mask import encode
-from mbloodmoon.mask import psf
-from mbloodmoon.mask import variance
+from bloodmoon.assets import _path_test_mask
+from bloodmoon.mask import codedmask
+from bloodmoon.mask import decode
+from bloodmoon.mask import encode
+from bloodmoon.mask import psf
+from bloodmoon.mask import variance
 
-_path_test_mask = "/home/edoardo/Datadisk/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Simulations/wfm_mask.fits"
 
 class TestWFM(unittest.TestCase):
     def setUp(self):

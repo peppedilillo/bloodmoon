@@ -3,7 +3,7 @@ import unittest
 
 import numpy as np
 
-from mbloodmoon.images import _rbilinear
+from bloodmoon.images import _rbilinear
 
 
 class TestAntibilinear(unittest.TestCase):

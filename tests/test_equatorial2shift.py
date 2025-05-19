@@ -3,12 +3,11 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from mbloodmoon.types import CoordEquatorial
-from mbloodmoon.coords import shift2equatorial, equatorial2shift
-from mbloodmoon.coords import _rotation_matrices
-import mbloodmoon as bm
-
-_path_test_mask = "/home/edoardo/Datadisk/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Simulations/wfm_mask.fits"
+from bloodmoon.assets import _path_test_mask
+from bloodmoon.types import CoordEquatorial
+from bloodmoon.coords import shift2equatorial, equatorial2shift
+from bloodmoon.coords import _rotation_matrices
+import bloodmoon as bm
 
 
 @dataclass(frozen=True)

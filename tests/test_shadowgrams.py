@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from mbloodmoon.images import _shift
+from bloodmoon.images import _shift
 
 
 class TestArrayShift(unittest.TestCase):

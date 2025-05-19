@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from mbloodmoon.images import _unframe
+from bloodmoon.images import _unframe
 
 
 class TestUnframe(unittest.TestCase):

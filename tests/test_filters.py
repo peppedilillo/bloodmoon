@@ -6,8 +6,8 @@ import unittest
 from unittest import TestCase
 
 import numpy as np
-from mbloodmoon.filtering import data_filter
-from mbloodmoon.filtering import flux_filter, source_filter, catalog_filter
+from bloodmoon.filtering import data_filter
+from bloodmoon.filtering import flux_filter, source_filter, catalog_filter
 
 
 class TestWrappers(TestCase):

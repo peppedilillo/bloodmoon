@@ -85,13 +85,13 @@ def pos2shift(
         - negative indexes are allowed.
     """
     n, m = camera.shape_sky
-    if not (-n <= y < n) or not (-m <= x < m):
+    if not (-(n + 1) <= y <= n) or not (-(m + 1) <= x <= m):
         raise IndexError(f"Indexes ({y}, {x}) are out of bound for sky shape {camera.shape_sky}.")
 
-    # bins resemble sky shape
-    binsx = camera.bins_sky.x
-    binsy = camera.bins_sky.y
-    return CoordSky(binsx[x], binsy[y])
+    return CoordSky(
+        camera.bins_sky.x[x],
+        camera.bins_sky.y[y],
+    )
 
 
 def shift2theta(camera: CodedMaskCamera, shift: float) -> float:
