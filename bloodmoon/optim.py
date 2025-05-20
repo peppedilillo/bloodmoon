@@ -33,11 +33,17 @@ from .mask import count
 from .mask import decode
 from .mask import model_shadowgram
 from .mask import model_sky
-from .mask import shift2pos
 from .mask import snratio
 from .mask import strip
 from .mask import variance
 from .types import UpscaleFactor
+from .coords import shift2pos
+
+__all__ = [
+    "_convolution_kernel_psfy_cached", "_detector_footprint_cached",
+    "_init_model_coarse", "_init_model_fine", "_loss",
+    "optimize", "iros",
+]
 
 
 @lru_cache(maxsize=1)
@@ -217,7 +223,7 @@ def _init_model_fine(
             decoded_components = cache_get((pivot, *relative_positions))
         else:
             # print("no cache hit")
-            n, m = camera.sky_shape
+            n, m = camera.shape_sky
             pivot_i, pivot_j = pivot
             i_min, i_max, j_min, j_max = _detector_footprint_cached(camera)
             r, c = (n // 2 - pivot_i), (m // 2 - pivot_j)
@@ -612,15 +618,15 @@ def iros(
 
     def subtract(
         arg: tuple[int, int],
-        sky: np.ndarray,
-        snr_map: np.ndarray,
+        sky: npt.NDArray,
+        snr_map: npt.NDArray,
     ) -> tuple[tuple[float, float, float, float], np.ndarray]:
         """Runs optimizer and subtract source."""
         try:
             shiftx, shifty, fluence = optimize(
-                camera,
-                sky,
-                arg,
+                camera=camera,
+                sky=sky,
+                arg_sky=arg,
                 vignetting=vignetting,
                 psfy=psfy,
             )
@@ -628,13 +634,20 @@ def iros(
             raise RuntimeError(f"Optimization failed: {str(e)}") from e
 
         significance = float(snr_map[*shift2pos(camera, shiftx, shifty)])
-        model = model_sky(camera, shiftx, shifty, fluence)
+        model = model_sky(
+            camera=camera,
+            shift_x=shiftx,
+            shift_y=shifty,
+            fluence=fluence,
+            vignetting=vignetting,
+            psfy=psfy,
+        )
         residual = sky - model
         return (shiftx, shifty, fluence, significance), residual
 
     def compute_snratios(
-        skymaps: tuple[np.ndarray, np.ndarray],
-        varmaps: tuple[np.ndarray, np.ndarray],
+        skymaps: tuple[npt.NDArray, npt.NDArray],
+        varmaps: tuple[npt.NDArray, npt.NDArray],
     ) -> tuple[np.ndarray, np.ndarray]:
         """Computes skies SNR."""
         # variance is clipped to improve numerical stability for off-axis sources,

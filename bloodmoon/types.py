@@ -4,8 +4,12 @@ Custom data types and containers for the WFM analysis pipeline.
 
 from typing import NamedTuple
 
-import numpy as np
 import numpy.typing as npt
+
+__all__ = [
+    "CoordEquatorial", "CoordHorizontal", "CoordSky",
+    "BinsRectangular", "BinsEquatorial", "UpscaleFactor",
+]
 
 
 class CoordEquatorial(NamedTuple):
@@ -31,6 +35,18 @@ class CoordHorizontal(NamedTuple):
 
     az: float
     al: float
+
+
+class CoordSky(NamedTuple):
+    """Sky-shifts coordinates.
+
+    Args:
+        shift_x: X coordinate in sky-shift space
+        shift_y: Y coordinate in sky-shift space
+    """
+
+    shift_x: float
+    shift_y: float
 
 
 class BinsRectangular(NamedTuple):

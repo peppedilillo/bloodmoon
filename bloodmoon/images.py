@@ -23,36 +23,157 @@ from scipy.interpolate import RegularGridInterpolator
 from .types import BinsRectangular
 from .types import UpscaleFactor
 
+__all__ = [
+    "_enlarge", "upscale", "_reduce",
+    "downscale", "compose", "argmax",
+    "_rbilinear", "_rbilinear_relative",
+    "_interp", "_shift",
+    "_erosion", "_unframe",
+]
 
-def upscale(
+
+def _enlarge(
     m: npt.NDArray,
-    upscale_x: int = 1,
-    upscale_y: int = 1,
-) -> np.ndarray:
-    """Upscale a 2D array by repeating elements along each axis.
+    upscale_f: UpscaleFactor,
+) -> npt.NDArray:
+    """
+    Oversamples a 2D array by repeating elements along the axes.
 
     Args:
-        m: Input 2D array
-        upscale_x: upscaling factor over the x direction
-        upscale_y: upscaling factor over the y direction
+        m (npt.NDArray): Input 2D array.
+        upscale_f (UpscaleFactor): Upscaling factors.
 
     Returns:
-        Upscaled array with dimensions multiplied by respective scaling factors
+        output (npt.NDArray): Oversampled array.
+
+    Notes:
+        - the total sum is NOT conserved.
+    """    
+    for i, f in enumerate(upscale_f[::-1]):
+        m = np.repeat(m, f, axis=i)
+    return m
+
+
+def upscale(
+    data: npt.NDArray,
+    upscale_y: int = 1,
+    upscale_x: int = 1,
+) -> npt.NDArray:
+    """
+    Upscales a 2D array by repeating elements along each axis and
+    by interpolating array values.
+
+    Args:
+        data (npt.NDArray): Input 2D array.
+        upscale_y (int): Upscaling factor over the y direction.
+        upscale_x (int): Upscaling factor over the x direction.
+
+    Returns:
+        output (npt.NDArray): Oversampled array.
 
     Raises:
-        ValueError: for invalid upscale factors (everything but positive integers).
+        ValueError: if upscale factors are not positive integers.
+    
+    Notes:
+        - The array total sum is conserved through linear interpolation.
+        - For N-dim arrays, consider using `astropy.nndata.block_replicate()`.
     """
-    if not ((isinstance(upscale_x, int) and upscale_x > 0) and (isinstance(upscale_y, int) and upscale_y > 0)):
-        raise ValueError("Upscale factors must be positive integers.")
+    if not (
+        (isinstance(upscale_y, int) and upscale_y > 0) and
+        (isinstance(upscale_x, int) and upscale_x > 0)
+    ):
+        raise ValueError("Upscaling factors must be positive integers.")
+    
+    upscaling = UpscaleFactor(upscale_x, upscale_y)
+    return _enlarge(data, upscaling) / np.prod(upscaling)
 
-    # VERY careful here, the next is not a typo.
-    # if i'm upscaling by (2, 1). it means i'm doubling the elements
-    # over the x direction, while keeping the same element over the y direction.
-    # this means doubling the number of columns in the mask array, while
-    # keeping the number of rows the same.
-    m = np.repeat(m, upscale_y, axis=0)
-    m = np.repeat(m, upscale_x, axis=1)
-    return m
+
+def _reduce(
+    m: npt.NDArray,
+    downscaling: npt.NDArray,
+) -> npt.NDArray:
+    """
+    Downsamples a 2D array.
+
+    Args:
+        m (npt.NDArray): Input 2D array.
+        downscaling (npt.NDArray): Downscaling factors.
+
+    Returns:
+        output (npt.NDArray): Downsampled array.
+
+    Notes:
+        - the total sum is conserved.
+    """
+    def _handle_shape(
+        data: npt.NDArray,
+        factors: npt.NDArray,
+    ) -> npt.NDArray:
+        """Adjusts array for blocks subdivision by cutting extra-rows/columns."""
+
+        def _handle_axis(a: npt.NDArray, idx: int) -> npt.NDArray:
+            """Redistributes cutted values in the block-adjusted axis."""
+            return a[:idx] + a[idx:].sum(axis=0) / idx
+        
+        adj_shape = (np.array(data.shape) // factors) * factors
+        for ax in range(data.ndim):
+            if data.shape[ax] != adj_shape[ax]:
+                data = data.swapaxes(0, ax)
+                data = _handle_axis(data, adj_shape[ax])
+                data = data.swapaxes(0, ax)
+        return data
+
+    def _to_blocks(
+        data: npt.NDArray,
+        factors: npt.NDArray,
+    ) -> npt.NDArray:
+        """Reshapes input array into blocks."""
+        assert not np.any(np.mod(data.shape, factors) != 0)
+        nblocks = np.array(data.shape) // factors
+        reshaping = tuple(dim for dims in zip(nblocks, factors) for dim in dims)
+        return data.reshape(reshaping).transpose((0, 2, 1, 3))
+    
+    m = _handle_shape(m, downscaling)
+    m = _to_blocks(m, downscaling)
+    return m.sum(axis=(2, 3))
+
+
+def downscale(
+    data: npt.NDArray,
+    downscale_y: int = 1,
+    downscale_x: int = 1,
+) -> npt.NDArray:
+    """
+    Downscales a 2D array by dividing the input array in blocks
+    and adding over them to interpolate array values.
+
+    Args:
+        data (npt.NDArray): Input 2D array.
+        downscale_y (int): Downscaling factor over the y direction.
+        downscale_x (int): Downscaling factor over the x direction.
+
+    Returns:
+        output (npt.NDArray): Downsampled array.
+
+    Raises:
+        ValueError: if downscale factors are not positive integers.
+    
+    Notes:
+        - The downsampling is performed through blocks subdivision, which
+          represent the elements of the downsampled array. Each block is
+          reduced by adding its elements for linear interpolation.
+        - The total sum of the array is conserved.
+        - For N-dim arrays, consider using `astropy.nndata.block_reduce()`.
+    """
+    
+    if not (
+        (isinstance(downscale_y, int) and downscale_y > 0) and
+        (isinstance(downscale_x, int) and downscale_x > 0)
+    ):
+        raise ValueError("Downscaling factors must be positive integers.")
+    
+    downscaling = np.array((downscale_y, downscale_x))
+    return _reduce(data, downscaling)
 
 
 def compose(
@@ -224,8 +345,8 @@ def _rbilinear(
     Y coordinates are supposed to grow top to bottom.
     X coordinates grow left to right.
 
-    The basic idea is to identify for poles and assign weights to it.
-    The more the center is close to a pole, the more weight the pole gets.
+    The basic idea is to identify four poles and to assign them weights.
+    The more the center is close to a pole, the more weight it gets.
 
            │            │            │
      ──────┼────────────┼────────────┼──────
@@ -237,7 +358,7 @@ def _rbilinear(
      ──────┼──┼─────────┼──┼─▲───────┼──────
            │  │         │  │ │ dy    │
            │  └─────────┼──┘ ▼       │
-           │   ◀───────▶│◀─▶         │
+           │   ◀───────▶│◀─▶     │
            │   (1 - dx) │ dx         │
            │C           │           D│
      ──────┼────────────┼────────────┼──────
@@ -266,16 +387,13 @@ def _rbilinear(
         raise ValueError("Grid boundaries must have at least 2 points")
     if not (np.all(np.diff(bins_x) > 0) and np.all(np.diff(bins_y) > 0)):
         raise ValueError("Grid bins must be strictly increasing")
-    if not (bins_x[0] < cx < bins_x[-1] and bins_y[0] < cy < bins_y[-1]):
+    if not (bins_x[0] <= cx <= bins_x[-1] and bins_y[0] <= cy <= bins_y[-1]):
         raise ValueError("Center lies outside grid.")
 
     i, j = (bisect(bins_y, cy) - 1), bisect(bins_x, cx) - 1
+    # this will take care of the pivots when it is falls on the border
     if i == 0 or j == 0 or i == len(bins_y) - 2 or j == len(bins_x) - 2:
-        return OrderedDict(
-            [
-                ((i, j), 1.0),
-            ]
-        )
+        return OrderedDict([((i, j), 1.0)])
 
     mx, my = (bins_x[j] + bins_x[j + 1]) / 2, (bins_y[i] + bins_y[i + 1]) / 2
     deltax, deltay = cx - mx, cy - my
@@ -304,6 +422,23 @@ def _rbilinear(
     )
     total = sum(weights.values())
     return OrderedDict([(k, v / total) for k, v in weights.items()])
+
+
+def _rbilinear_relative(
+    cx: float,
+    cy: float,
+    bins_x: npt.NDArray,
+    bins_y: npt.NDArray,
+) -> tuple[OrderedDict, tuple[int, int]]:
+    """To avoid computing shifts many time, we create a slightly shadowgram and index over it.
+    This operation requires the results for rbilinear to be expressed relatively to the pivot."""
+    results_rbilinear = _rbilinear(cx, cy, bins_x, bins_y)
+    ((pivot_i, pivot_j), _), *__ = results_rbilinear.items()
+    # noinspection PyTypeChecker
+    return OrderedDict([((k_i - pivot_i, k_j - pivot_j), w) for (k_i, k_j), w in results_rbilinear.items()]), (
+        pivot_i,
+        pivot_j,
+    )
 
 
 def _interp(
@@ -387,7 +522,10 @@ def _shift(
         return np.zeros_like(a)
     vpadded = np.pad(a, ((0 if shift_i < 0 else shift_i, 0 if shift_i >= 0 else -shift_i), (0, 0)))
     vpadded = vpadded[:n, :] if shift_i > 0 else vpadded[-n:, :]
-    hpadded = np.pad(vpadded, ((0, 0), (0 if shift_j < 0 else shift_j, 0 if shift_j >= 0 else -shift_j)))
+    hpadded = np.pad(
+        vpadded,
+        ((0, 0), (0 if shift_j < 0 else shift_j, 0 if shift_j >= 0 else -shift_j)),
+    )
     hpadded = hpadded[:, :m] if shift_j > 0 else hpadded[:, -m:]
     return hpadded
 
@@ -468,23 +606,6 @@ def _erosion(
         (1 - decimal) * cborder_mask - arr_ * cborder_mask
     )
     # fmt: on
-
-
-def _rbilinear_relative(
-    cx: float,
-    cy: float,
-    bins_x: npt.NDArray,
-    bins_y: npt.NDArray,
-) -> tuple[OrderedDict, tuple[int, int]]:
-    """To avoid computing shifts many time, we create a slightly shadowgram and index over it.
-    This operation requires the results for rbilinear to be expressed relatively to the pivot."""
-    results_rbilinear = _rbilinear(cx, cy, bins_x, bins_y)
-    ((pivot_i, pivot_j), _), *__ = results_rbilinear.items()
-    # noinspection PyTypeChecker
-    return OrderedDict([((k_i - pivot_i, k_j - pivot_j), w) for (k_i, k_j), w in results_rbilinear.items()]), (
-        pivot_i,
-        pivot_j,
-    )
 
 
 def _unframe(a: npt.NDArray, value: float = 0.0) -> npt.NDArray:

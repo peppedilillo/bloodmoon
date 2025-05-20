@@ -11,7 +11,6 @@ This module implements the primary algorithms for:
 These components form the foundation of the WFM data analysis pipeline.
 """
 
-from bisect import bisect
 from bisect import bisect_left
 from bisect import bisect_right
 from dataclasses import dataclass
@@ -32,28 +31,19 @@ from .images import _rbilinear_relative
 from .images import _shift
 from .images import _unframe
 from .images import argmax
-from .images import upscale
+from .images import _enlarge
 from .io import MaskDataLoader
 from .types import BinsRectangular
 from .types import UpscaleFactor
 
-
-def _bin(
-    start: float,
-    stop: float,
-    step: float,
-) -> npt.NDArray:
-    """Returns equally spaced points between start and stop, included.
-
-    Args:
-        start: Minimum x-coordinate
-        stop: Minimum y-coordinate
-        step: Maximum x-coordinate
-
-    Returns:
-        Bin edges array.
-    """
-    return np.linspace(start, stop, int((stop - start) / step) + 1)
+__all__ = [
+    "_fold", "_bisect_interval", "CodedMaskCamera",
+    "codedmask", "encode", "decode", "psf", "count",
+    "_detector_footprint", "_packing_factor", "strip",
+    "chop", "_interpmax", "_modsech", "psfy_wfm",
+    "_convolution_kernel_psfy", "apply_vignetting",
+    "model_shadowgram", "model_sky",
+]
 
 
 def _fold(
@@ -140,15 +130,42 @@ class CodedMaskCamera:
         """Returns a dictionary of mask parameters useful for image reconstruction."""
         return self.mdl.specs
 
+    @cached_property
+    def shape_detector(self) -> tuple[int, int]:
+        """Shape of the detector array (rows, columns)."""
+        xmin = np.floor(self.mdl["detector_minx"] / (self.mdl["mask_deltax"] / self.upscale_f.x))
+        xmax = np.ceil(self.mdl["detector_maxx"] / (self.mdl["mask_deltax"] / self.upscale_f.x))
+        ymin = np.floor(self.mdl["detector_miny"] / (self.mdl["mask_deltay"] / self.upscale_f.y))
+        ymax = np.ceil(self.mdl["detector_maxy"] / (self.mdl["mask_deltay"] / self.upscale_f.y))
+        return int(ymax - ymin), int(xmax - xmin)
+
+    @cached_property
+    def shape_mask(self) -> tuple[int, int]:
+        """Shape of the mask array (rows, columns).
+        """
+        # there is no need for this since we can just `mask.shape` but since we have the other already..
+        return (
+            int((self.mdl["mask_maxy"] - self.mdl["mask_miny"]) / (self.mdl["mask_deltay"] / self.upscale_f.y)),
+            int((self.mdl["mask_maxx"] - self.mdl["mask_minx"]) / (self.mdl["mask_deltax"] / self.upscale_f.x)),
+        )
+
+    @cached_property
+    def shape_sky(self) -> tuple[int, int]:
+        """Shape of the reconstructed sky image (rows, columns)."""
+        n, m = self.shape_detector
+        o, p = self.shape_mask
+        return n + o - 1, m + p - 1
+
     def _bins_mask(
         self,
         upscale_f: UpscaleFactor,
     ) -> BinsRectangular:
-        """Generate binning structure for mask with given upscale factors."""
-        return BinsRectangular(
-            _bin(self.mdl["mask_minx"], self.mdl["mask_maxx"], self.mdl["mask_deltax"] / upscale_f.x),
-            _bin(self.mdl["mask_miny"], self.mdl["mask_maxy"], self.mdl["mask_deltay"] / upscale_f.y),
-        )
+        """Returns bins for mask with given upscale factors."""
+        l, r = self.mdl["mask_minx"], self.mdl["mask_maxx"]
+        b, t = self.mdl["mask_miny"], self.mdl["mask_maxy"]
+        xsteps = int((r - l) / (self.mdl["mask_deltax"] / upscale_f.x)) + 1
+        ysteps = int((t - b) / (self.mdl["mask_deltay"] / upscale_f.y)) + 1
+        return BinsRectangular(np.linspace(l, r, xsteps), np.linspace(b, t, ysteps))
 
     @cached_property
     def bins_mask(self) -> BinsRectangular:
@@ -156,14 +173,25 @@ class CodedMaskCamera:
         return self._bins_mask(self.upscale_f)
 
     def _bins_detector(self, upscale_f: UpscaleFactor) -> BinsRectangular:
-        """Generate binning structure for detector with given upscale factors."""
+        """Returns bins for detector with given upscale factors.
+        The detector bins are aligned to the mask bins.
+        To guarantee this, we may need to extend the detector bin a bit over the mask.
+
+         ◀────────────mask────────────▶
+         │    │    │    │    │    │    │
+         └────┴────┴────┴────┴────┴────┘
+        -3   -2   -1    0    +1   +2   +3
+              ┌─┬──┬────┬────┬──┬─┐
+              │    │    │    │    │
+                │               │
+                ◀───detector────▶
+                │               │
+           detector_min   detector_max
+        """
         bins = self._bins_mask(self.upscale_f)
-        xmin, xmax = _bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
-        ymin, ymax = _bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
-        return BinsRectangular(
-            _bin(bins.x[xmin], bins.x[xmax], self.mdl["mask_deltax"] / upscale_f.x),
-            _bin(bins.y[ymin], bins.y[ymax], self.mdl["mask_deltay"] / upscale_f.y),
-        )
+        jmin, jmax = _bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
+        imin, imax = _bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
+        return BinsRectangular(self.bins_mask.x[jmin : jmax + 1], self.bins_mask.y[imin : imax + 1])
 
     @cached_property
     def bins_detector(self) -> BinsRectangular:
@@ -171,15 +199,34 @@ class CodedMaskCamera:
         return self._bins_detector(self.upscale_f)
 
     def _bins_sky(self, upscale_f: UpscaleFactor) -> BinsRectangular:
-        """Binning structure for the reconstructed sky image."""
+        """Returns bins for the reconstructed sky image.cd
+        While the mask and detector bins are aligned, the sky-bins are not.
+
+            │    │    │    │    │    │    │
+           ◀────┴────┴──mask───┴────┴───▶┘
+            0    1    2    3    4    5    6
+
+                      │    │    │
+                     ◀───det───▶
+                      0    1    2
+
+         │    │    │    │     │    │    │    │
+        ◀────┴────┴────┴─sky─┴────┴────┴────▶
+         0    1    2    3     4    5    6    7
+        """
         binsd, binsm = self._bins_detector(upscale_f), self._bins_mask(upscale_f)
-        xstep, ystep = (
-            binsm.x[1] - binsm.x[0],
-            binsm.y[1] - binsm.y[0],
-        )
+        xstep, ystep = binsm.x[1] - binsm.x[0], binsm.y[1] - binsm.y[0]
         return BinsRectangular(
-            np.linspace(binsd.x[0] + binsm.x[0] + xstep, binsd.x[-1] + binsm.x[-1], self.sky_shape[1] + 1),
-            np.linspace(binsd.y[0] + binsm.y[0] + ystep, binsd.y[-1] + binsm.y[-1], self.sky_shape[0] + 1),
+            np.linspace(
+                binsd.x[0] + binsm.x[0] + xstep / 2,
+                binsd.x[-1] + binsm.x[-1] - xstep / 2,
+                self.shape_sky[1] + 1,
+            ),
+            np.linspace(
+                binsd.y[0] + binsm.y[0] + ystep / 2,
+                binsd.y[-1] + binsm.y[-1] - ystep / 2,
+                self.shape_sky[0] + 1,
+            ),
         )
 
     @cached_property
@@ -190,12 +237,18 @@ class CodedMaskCamera:
     @cached_property
     def mask(self) -> npt.NDArray:
         """2D array representing the coded mask pattern."""
-        return upscale(_fold(self.mdl.mask, self._bins_mask(UpscaleFactor(1, 1))).astype(int), *self.upscale_f)
+        return _enlarge(
+            _fold(self.mdl.mask, self._bins_mask(UpscaleFactor(1, 1))).astype(int),
+            self.upscale_f,
+        )
 
     @cached_property
     def decoder(self) -> npt.NDArray:
         """2D array representing the mask pattern used for decoding."""
-        return upscale(_fold(self.mdl.decoder, self._bins_mask(UpscaleFactor(1, 1))), *self.upscale_f)
+        return _enlarge(
+            _fold(self.mdl.decoder, self._bins_mask(UpscaleFactor(1, 1))),
+            self.upscale_f,
+        )
 
     @cached_property
     def bulk(self) -> npt.NDArray:
@@ -205,36 +258,12 @@ class CodedMaskCamera:
         bins = self._bins_mask(self.upscale_f)
         xmin, xmax = _bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
         ymin, ymax = _bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
-        return upscale(framed_bulk, *self.upscale_f)[ymin:ymax, xmin:xmax]
+        return _enlarge(framed_bulk, self.upscale_f)[ymin:ymax, xmin:xmax]
 
     @cached_property
     def balancing(self) -> npt.NDArray:
         """2D array representing the correlation between decoder and bulk patterns."""
         return correlate(self.decoder, self.bulk, mode="full")
-
-    @cached_property
-    def detector_shape(self) -> tuple[int, int]:
-        """Shape of the detector array (rows, columns)."""
-        xmin = np.floor(self.mdl["detector_minx"] / (self.mdl["mask_deltax"] / self.upscale_f.x))
-        xmax = np.ceil(self.mdl["detector_maxx"] / (self.mdl["mask_deltax"] / self.upscale_f.x))
-        ymin = np.floor(self.mdl["detector_miny"] / (self.mdl["mask_deltay"] / self.upscale_f.y))
-        ymax = np.ceil(self.mdl["detector_maxy"] / (self.mdl["mask_deltay"] / self.upscale_f.y))
-        return int(ymax - ymin), int(xmax - xmin)
-
-    @cached_property
-    def mask_shape(self) -> tuple[int, int]:
-        """Shape of the mask array (rows, columns)."""
-        return (
-            int((self.mdl["mask_maxy"] - self.mdl["mask_miny"]) / (self.mdl["mask_deltay"] / self.upscale_f.y)),
-            int((self.mdl["mask_maxx"] - self.mdl["mask_minx"]) / (self.mdl["mask_deltax"] / self.upscale_f.x)),
-        )
-
-    @cached_property
-    def sky_shape(self) -> tuple[int, int]:
-        """Shape of the reconstructed sky image (rows, columns)."""
-        n, m = self.detector_shape
-        o, p = self.mask_shape
-        return n + o - 1, m + p - 1
 
 
 def codedmask(
@@ -287,8 +316,27 @@ def encode(
     Returns:
         2D array representing detector shadowgram
     """
-    unnormalized_shadowgram = correlate(camera.mask, sky, mode="valid")
-    return unnormalized_shadowgram
+    return correlate(camera.mask, sky, mode="valid") * camera.bulk
+
+
+def decode(
+    camera: CodedMaskCamera,
+    detector: npt.NDArray,
+) -> npt.NDArray:
+    """Reconstruct balanced sky image from detector counts using cross-correlation.
+
+    Args:
+        camera: CodedMaskCamera object containing mask and decoder patterns
+        detector: 2D array of detector counts
+
+    Returns:
+        Balanced cross-correlation sky image
+            - Variance map of the reconstructed sky image
+    """
+    cc = correlate(camera.decoder, detector, mode="full")
+    sum_det, sum_bulk = map(np.sum, (detector, camera.bulk))
+    cc_bal = cc - camera.balancing * sum_det / sum_bulk
+    return cc_bal
 
 
 def variance(
@@ -331,26 +379,6 @@ def snratio(
     variance_clipped = np.clip(var, a_min=0.0, a_max=None) if np.any(var < 0) else var
     variance_unframed = _unframe(variance_clipped, value=np.inf)
     return sky / np.sqrt(variance_unframed)
-
-
-def decode(
-    camera: CodedMaskCamera,
-    detector: npt.NDArray,
-) -> npt.NDArray:
-    """Reconstruct balanced sky image from detector counts using cross-correlation.
-
-    Args:
-        camera: CodedMaskCamera object containing mask and decoder patterns
-        detector: 2D array of detector counts
-
-    Returns:
-        Balanced cross-correlation sky image
-            - Variance map of the reconstructed sky image
-    """
-    cc = correlate(camera.decoder, detector, mode="full")
-    sum_det, sum_bulk = map(np.sum, (detector, camera.bulk))
-    cc_bal = cc - camera.balancing * sum_det / sum_bulk
-    return cc_bal
 
 
 def psf(camera: CodedMaskCamera) -> npt.NDArray:
@@ -510,8 +538,8 @@ _PSFX_WFM_PARAMS = {
 }
 _PSFY_WFM_PARAMS = {
     "center": 0,
-    "alpha": 0.2592,
-    "beta": 0.5972,
+    "alpha": 0.3214,
+    "beta": 0.6246,
 }
 
 
@@ -602,11 +630,11 @@ def apply_vignetting(
     """
     bins = camera.bins_detector
 
-    angle_x_rad = abs(np.arctan(shift_x / camera.mdl["mask_detector_distance"]))
+    angle_x_rad = abs(np.arctan(shift_x / camera.mdl["detector_topmask_dist"]))
     red_factor = camera.mdl["mask_thickness"] * np.tan(angle_x_rad)
     sg1 = _erosion(shadowgram, bins.x[1] - bins.x[0], red_factor)
 
-    angle_y_rad = abs(np.arctan(shift_y / camera.mdl["mask_detector_distance"]))
+    angle_y_rad = abs(np.arctan(shift_y / camera.mdl["detector_topmask_dist"]))
     red_factor = camera.mdl["mask_thickness"] * np.tan(angle_y_rad)
     sg2 = _erosion(shadowgram.T, bins.y[1] - bins.y[0], red_factor)
     return sg1 * sg2.T
@@ -650,7 +678,7 @@ def model_shadowgram(
         -1: slice(None, -2),
     }
 
-    n, m = camera.sky_shape
+    n, m = camera.shape_sky
     i_min, i_max, j_min, j_max = _detector_footprint(camera)
     _mask = apply_vignetting(camera, camera.mask, shift_x, shift_y) if vignetting else camera.mask
     _mask = convolve(_mask, _convolution_kernel_psfy(camera), mode="same") if psfy else _mask
@@ -700,31 +728,4 @@ def model_sky(
         - For optimization, consider using the dedicated, cached function of `optim.py`
     """
     return decode(camera, model_shadowgram(camera, shift_x, shift_y, fluence, vignetting, psfy))
-
-
-def shift2pos(camera: CodedMaskCamera, shift_x: float, shift_y: float) -> tuple[int, int]:
-    """
-    Convert continuous sky-shift coordinates to nearest discrete pixel indices.
-
-    Args:
-        camera: CodedMaskCamera instance containing binning information
-        shift_x: x-coordinate in sky-shift space (mm)
-        shift_y: y-coordinate in sky-shift space (mm)
-
-    Returns:
-        Tuple of (row, column) indices in the discrete sky image grid
-
-    Raises:
-        ValueError: If shifts are outside valid range
-    """
-    def check_bounds(bins, shift):
-        """Checks shifts validity wrt binning."""
-        return (shift >= bins[0]) and (shift <= bins[-1])
-    
-    if not (
-        check_bounds(camera.bins_sky.y, shift_y) and check_bounds(camera.bins_sky.x, shift_x)
-    ):
-        raise ValueError("Shifts outside binning boundaries.")
-    
-    return bisect(camera.bins_sky.y, shift_y) - 1, bisect(camera.bins_sky.x, shift_x) - 1
         

@@ -84,7 +84,7 @@ For more take a look at our [demo](demo/demo.ipynb).
 
 ### Running Tests
 
-Assuming you installed from sources, and your source living into `bloodmon` directory.
+Assuming you installed from sources, and your source living into `bloodmoon` directory.
 
 ```bash
 cd bloodmoon

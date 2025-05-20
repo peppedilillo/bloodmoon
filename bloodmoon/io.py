@@ -8,6 +8,7 @@ This module provides dataclasses and utilities for:
 - Parsing configuration data from FITS headers
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
@@ -18,11 +19,19 @@ from astropy.io.fits.header import Header
 
 from bloodmoon.types import CoordEquatorial
 from bloodmoon.types import CoordHorizontal
+from bloodmoon.filtering import data_filter
+
+__all__ = [
+    "_validate_fits", "check_fits",
+    "simulation_files", "SimulationDataLoader",
+    "MaskDataLoader", "fetch_mask",
+]
 
 
 def _validate_fits(filepath: Path) -> bool:
-    """Following astropy's approach, reads the first FITS card (80 bytes) and checks for
-    the SIMPLE keyword signature.
+    """
+    Following astropy's approach, reads the first FITS card (80 bytes)
+    and checks for the SIMPLE keyword signature.
 
     Args:
         filepath: Path object pointing to the file to validate
@@ -43,6 +52,27 @@ def _validate_fits(filepath: Path) -> bool:
 
     match_sig = simple[:29] == fits_signature[:-1] and simple[29:30] in (b"T", b"F")
     return match_sig
+
+
+def check_fits(filepath: Path) -> bool:
+    """
+    Check presence and validity of the FITS file.
+
+    Args:
+        filepath (str | Path): Path to the FITS file.
+    
+    Returns:
+        output (bool): True if FITS exists and in valid format.
+
+    Raises:
+        FileNotFoundError: If FITS file does not exist.
+        ValueError: If file not in valid FITS format.
+    """
+    if not filepath.is_file():
+        raise FileNotFoundError(f"FITS file '{filepath}' does not exist.")
+    elif not _validate_fits(filepath):
+        raise ValueError("File not in valid FITS format.")
+    return True
 
 
 def simulation_files(dirpath: str | Path) -> dict[str, dict[str, Path]]:
@@ -93,12 +123,16 @@ class SimulationDataLoader:
     FITS file containing WFM simulation data for a single camera.
 
     Attributes:
-        filepath (Path): Path to the FITS file
+        filepath (Path):
+            Path to the FITS file.
+        energy_range (int | float | tuple[int | float, int | float] | None):
+            Energy range in keV for the data filtering.
+        coords (tuple[float, float] | Sequence[tuple[float, float]] | None):
+            Input photons RA/Dec (or sequence of RA/Dec) to filter out.
 
     Properties:
-        data: Photon event data from FITS extension 1
-        header: Primary FITS header
-        mask_detector_distance (float): Distance between mask and detector in mm
+        data: Photon event data from FITS extension 1.
+        header: Primary FITS header.
         pointings (dict[str, CoordEquatorial]): Camera axis directions in equatorial frame
             - 'z': Optical axis pointing (RA/Dec)
             - 'x': Camera x-axis pointing (RA/Dec)
@@ -108,10 +142,19 @@ class SimulationDataLoader:
     """
 
     filepath: Path
+    energy_range: int | tuple[int, int] | None
+    coords: tuple[float, float] | Sequence[tuple[float, float]] | None
 
     @cached_property
     def data(self) -> FITS_rec:
-        return fits.getdata(self.filepath, ext=1, header=False)
+        rec = fits.getdata(self.filepath, ext=1, header=False)
+        if self.energy_range or self.coords:
+            rec = data_filter(
+                record=rec,
+                energy_range=self.energy_range,
+                coords=self.coords,
+            )
+        return rec
 
     @cached_property
     def header(self) -> Header:
@@ -148,22 +191,30 @@ class SimulationDataLoader:
         }
 
 
-def simulation(filepath: str | Path) -> SimulationDataLoader:
+def simulation(
+    filepath: str | Path,
+    energy_range: int | tuple[int, int] | None = None,
+    coords: tuple[float, float] | Sequence[tuple[float, float]] | None = None,
+) -> SimulationDataLoader:
     """
     Checks validity of filepath and intializes SimulationDataLoader.
 
     Args:
-        filepath: path to FITS file.
+        filepath:
+            Path to FITS file.
+        energy_range (int | float | tuple[int | float, int | float] | None, optional (default=None)):
+            Energy range in keV for the data filtering. If a specific energy
+            is given, this will be considered as the maximum filter value.
+            If a tuple is given, it's interpreted as (`E_min`, `E_max`).
+        coords (tuple[float, float] | Sequence[tuple[float, float]] | None, optional (default=None)):
+            Input photons RA/Dec (or sequence of RA/Dec) to filter out.
 
     Returns:
-        a MaskDataLoader dataclass.
+        a SimulationDataLoader dataclass.
     """
-    dr = Path(filepath)
-    if not dr.is_file():
-        raise FileNotFoundError(f"The simulation file {dr.name} does not exists.")
-    if not _validate_fits(filepath):
-        raise ValueError("File not in valid FITS format.")
-    return SimulationDataLoader(filepath)
+    if check_fits(Path(filepath)):
+        sdl = SimulationDataLoader(filepath, energy_range, coords)
+    return sdl
 
 
 @dataclass(frozen=True)
@@ -196,10 +247,33 @@ class MaskDataLoader:
         Extract and convert mask parameters from FITS headers (extensions 0 and 2).
 
         Returns:
-            Dictionary of mask parameters (dimensions, bounds, distances) as float values
+            Dictionary of mask parameters (dimensions, bounds, distances) as float values:
+                - "mask_minx": left physical mask edge along x-axis [mm]
+                - "mask_miny": bottom physical mask edge along y-axis [mm]
+                - "mask_maxx": right physical mask edge along x-axis [mm]
+                - "mask_maxy": top physical mask edge along y-axis [mm]
+                - "mask_deltax": mask pixel physical dimension along x [mm]
+                - "mask_deltay": mask pixel physical dimension along y [mm]
+                - "mask_thickness": mask plate thickness [mm]
+                - "slit_deltax": slit length along x [mm]
+                - "slit_deltay": slit length along y [mm]
+                - "detector_minx": left physical detector edge along x-axis [mm]
+                - "detector_maxx": bottom physical detector edge along y-axis [mm]
+                - "detector_miny": right physical detector edge along x-axis [mm]
+                - "detector_maxy": top physical detector edge along y-axis [mm]
+                - "detector_bmmask_dist": detector - bottom mask distance [mm] (with detector median absorption)
+                - "detector_midmask_dist": detector - mid mask plate distance [mm] (with detector median absorption)
+                - "detector_topmask_dist": detector - top mask distance [mm] (with detector median absorption)
+                - "open_fraction": mask open fraction
+                - "real_open_fraction": mask open fraction with ribs correction
+        
+        Notes:
+            - The detector median absorption for the incident photons is set to 0.01 mm.
         """
         h1 = dict(fits.getheader(self.filepath, ext=0)) | dict(fits.getheader(self.filepath, ext=2))
         h2 = dict(fits.getheader(self.filepath, ext=3))
+
+        detector_absorption = 0.01     # median photon length absorption in the detector [mm]
 
         info = {
             "mask_minx": h1["MINX"],
@@ -215,9 +289,11 @@ class MaskDataLoader:
             "detector_maxx": h1["PLNXMAX"],
             "detector_miny": h1["PLNYMIN"],
             "detector_maxy": h1["PLNYMAX"],
-            "mask_detector_distance": h1["MDDIST"],
+            "detector_bmmask_dist": h1["MDDIST"] + detector_absorption,
+            "detector_midmask_dist": h1["MDDIST"] + h1["MASKTHK"] / 2 + detector_absorption,
+            "detector_topmask_dist": h1["MDDIST"] + h1["MASKTHK"] + detector_absorption,
             "open_fraction": h2["OPENFR"],
-            "real_open_fraction": h2["RLOPENFR"],
+            "real_open_fraction": h2["RLOPENFR"]
         }
 
         return {k: float(v) for k, v in info.items()}
@@ -263,12 +339,9 @@ def fetch_mask(filepath: str | Path) -> MaskDataLoader:
     Returns:
         a MaskDataLoader dataclass.
     """
-    fp = Path(filepath)
-    if not fp.is_file():
-        raise FileNotFoundError("Mask file does not exists")
-    if not _validate_fits(filepath):
-        raise ValueError("File not in valid FITS format.")
-    return MaskDataLoader(Path(filepath))
+    if check_fits(Path(filepath)):
+        mdl = MaskDataLoader(Path(filepath))
+    return mdl
 
 
 """
