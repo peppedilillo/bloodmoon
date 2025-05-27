@@ -51,7 +51,7 @@ def simulation_files(dirpath: str | Path) -> dict[str, dict[str, Path]]:
     Locate and validate all required FITS files in the root directory.
 
     Args:
-        dirpath (str | Path): Path to the FITS file.
+        dirpath: Path to the FITS file.
 
     Returns:
         Nested dictionary mapping camera IDs to their respective file paths
@@ -214,9 +214,7 @@ class MaskDataLoader:
                 - "detector_maxx": bottom physical detector edge along y-axis [mm]
                 - "detector_miny": right physical detector edge along x-axis [mm]
                 - "detector_maxy": top physical detector edge along y-axis [mm]
-                - "detector_bmmask_dist": detector - bottom mask distance [mm] (with detector median absorption)
-                - "detector_midmask_dist": detector - mid mask plate distance [mm] (with detector median absorption)
-                - "detector_topmask_dist": detector - top mask distance [mm] (with detector median absorption)
+                - "mask_detector_distance": detector - bottom mask distance [mm]
                 - "open_fraction": mask open fraction
                 - "real_open_fraction": mask open fraction with ribs correction
         """
