@@ -21,7 +21,8 @@ from bloodmoon.types import CoordHorizontal
 
 
 def _validate_fits(filepath: Path) -> bool:
-    """Following astropy's approach, reads the first FITS card (80 bytes) and checks for
+    """
+    Following astropy's approach, reads the first FITS card (80 bytes) and checks for
     the SIMPLE keyword signature.
 
     Args:
@@ -48,6 +49,9 @@ def _validate_fits(filepath: Path) -> bool:
 def simulation_files(dirpath: str | Path) -> dict[str, dict[str, Path]]:
     """
     Locate and validate all required FITS files in the root directory.
+
+    Args:
+        dirpath: Path to the FITS file.
 
     Returns:
         Nested dictionary mapping camera IDs to their respective file paths
@@ -156,7 +160,7 @@ def simulation(filepath: str | Path) -> SimulationDataLoader:
         filepath: path to FITS file.
 
     Returns:
-        a MaskDataLoader dataclass.
+        a SimulationDataLoader dataclass.
     """
     dr = Path(filepath)
     if not dr.is_file():
@@ -196,7 +200,23 @@ class MaskDataLoader:
         Extract and convert mask parameters from FITS headers (extensions 0 and 2).
 
         Returns:
-            Dictionary of mask parameters (dimensions, bounds, distances) as float values
+            Dictionary of mask parameters (dimensions, bounds, distances) as float values:
+                - "mask_minx": left physical mask edge along x-axis [mm]
+                - "mask_miny": bottom physical mask edge along y-axis [mm]
+                - "mask_maxx": right physical mask edge along x-axis [mm]
+                - "mask_maxy": top physical mask edge along y-axis [mm]
+                - "mask_deltax": mask pixel physical dimension along x [mm]
+                - "mask_deltay": mask pixel physical dimension along y [mm]
+                - "mask_thickness": mask plate thickness [mm]
+                - "slit_deltax": slit length along x [mm]
+                - "slit_deltay": slit length along y [mm]
+                - "detector_minx": left physical detector edge along x-axis [mm]
+                - "detector_maxx": bottom physical detector edge along y-axis [mm]
+                - "detector_miny": right physical detector edge along x-axis [mm]
+                - "detector_maxy": top physical detector edge along y-axis [mm]
+                - "mask_detector_distance": detector - bottom mask distance [mm]
+                - "open_fraction": mask open fraction
+                - "real_open_fraction": mask open fraction with ribs correction
         """
         h1 = dict(fits.getheader(self.filepath, ext=0)) | dict(fits.getheader(self.filepath, ext=2))
         h2 = dict(fits.getheader(self.filepath, ext=3))

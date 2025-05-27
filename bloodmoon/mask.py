@@ -42,7 +42,8 @@ def _fold(
     ml: FITS_rec,
     mask_bins: BinsRectangular,
 ) -> npt.NDArray:
-    """Convert mask data from FITS record to 2D binned array.
+    """
+    Convert mask data from FITS record to 2D binned array.
 
     Args:
         ml: FITS record containing mask data
@@ -102,7 +103,8 @@ i swear
 
 @dataclass(frozen=True)
 class CodedMaskCamera:
-    """Dataclass containing a coded mask camera system.
+    """
+    Dataclass containing a coded mask camera system.
 
     Handles mask pattern, detector geometry, and related calculations for coded mask imaging.
 
@@ -165,7 +167,8 @@ class CodedMaskCamera:
         return self._bins_mask(self.upscale_f)
 
     def _bins_detector(self, upscale_f: UpscaleFactor) -> BinsRectangular:
-        """Returns bins for detector with given upscale factors.
+        """
+        Returns bins for detector with given upscale factors.
         The detector bins are aligned to the mask bins.
         To guarantee this, we may need to extend the detector bin a bit over the mask.
 
@@ -191,7 +194,8 @@ class CodedMaskCamera:
         return self._bins_detector(self.upscale_f)
 
     def _bins_sky(self, upscale_f: UpscaleFactor) -> BinsRectangular:
-        """Returns bins for the reconstructed sky image.cd
+        """
+        Returns bins for the reconstructed sky image.cd
         While the mask and detector bins are aligned, the sky-bins are not.
 
             │    │    │    │    │    │    │
@@ -299,7 +303,8 @@ def encode(
     camera: CodedMaskCamera,
     sky: np.ndarray,
 ) -> npt.NDArray:
-    """Generate detector shadowgram from sky image through coded mask.
+    """
+    Generate detector shadowgram from sky image through coded mask.
 
     Args:
         camera: CodedMaskCamera object containing mask pattern
@@ -316,7 +321,8 @@ def decode(
     camera: CodedMaskCamera,
     detector: npt.NDArray,
 ) -> npt.NDArray:
-    """Reconstruct balanced sky image from detector counts using cross-correlation.
+    """
+    Reconstruct balanced sky image from detector counts using cross-correlation.
 
     Args:
         camera: CodedMaskCamera object containing mask and decoder patterns
@@ -336,7 +342,8 @@ def variance(
     camera: CodedMaskCamera,
     detector: npt.NDArray,
 ) -> npt.NDArray:
-    """Reconstruct balanced sky variance from detector counts.
+    """
+    Reconstruct balanced sky variance from detector counts.
 
     Args:
         camera: CodedMaskCamera object containing mask and decoder patterns
@@ -356,7 +363,8 @@ def snratio(
     sky: npt.NDArray,
     var: npt.NDArray,
 ) -> npt.NDArray:
-    """Calculate signal-to-noise ratio from sky signal and variance arrays.
+    """
+    Calculate signal-to-noise ratio from sky signal and variance arrays.
 
     Args:
         sky: Array containing sky signal values.
@@ -375,7 +383,8 @@ def snratio(
 
 
 def psf(camera: CodedMaskCamera) -> npt.NDArray:
-    """Calculate Point Spread Function (PSF) of the coded mask system.
+    """
+    Calculate Point Spread Function (PSF) of the coded mask system.
 
     Args:
         camera: CodedMaskCamera object containing mask and decoder patterns
@@ -390,7 +399,8 @@ def count(
     camera: CodedMaskCamera,
     data: npt.NDArray,
 ) -> tuple[npt.NDArray, npt.NDArray]:
-    """Create 2D histogram of detector counts from event data.
+    """
+    Create 2D histogram of detector counts from event data.
 
     Args:
         camera: CodedMaskCamera object containing detector binning
