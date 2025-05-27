@@ -20,6 +20,7 @@ import numpy.typing as npt
 from scipy.optimize import minimize
 from scipy.signal import convolve
 
+from .coords import shift2pos
 from .images import _rbilinear_relative
 from .images import _shift
 from .io import SimulationDataLoader
@@ -33,7 +34,6 @@ from .mask import count
 from .mask import decode
 from .mask import model_shadowgram
 from .mask import model_sky
-from .mask import shift2pos
 from .mask import snratio
 from .mask import strip
 from .mask import variance
@@ -613,15 +613,15 @@ def iros(
 
     def subtract(
         arg: tuple[int, int],
-        sky: np.ndarray,
-        snr_map: np.ndarray,
-    ) -> tuple[tuple[float, float, float, float], np.ndarray]:
+        sky: npt.NDArray,
+        snr_map: npt.NDArray,
+    ) -> tuple[tuple[float, float, float, float], npt.NDArray]:
         """Runs optimizer and subtract source."""
         try:
             shiftx, shifty, fluence = optimize(
-                camera,
-                sky,
-                arg,
+                camera=camera,
+                sky=sky,
+                arg_sky=arg,
                 vignetting=vignetting,
                 psfy=psfy,
             )
@@ -629,14 +629,21 @@ def iros(
             raise RuntimeError(f"Optimization failed: {str(e)}") from e
 
         significance = float(snr_map[*shift2pos(camera, shiftx, shifty)])
-        model = model_sky(camera, shiftx, shifty, fluence)
+        model = model_sky(
+            camera=camera,
+            shift_x=shiftx,
+            shift_y=shifty,
+            fluence=fluence,
+            vignetting=vignetting,
+            psfy=psfy,
+        )
         residual = sky - model
         return (shiftx, shifty, fluence, significance), residual
 
     def compute_snratios(
-        skymaps: tuple[np.ndarray, np.ndarray],
-        varmaps: tuple[np.ndarray, np.ndarray],
-    ) -> tuple[np.ndarray, np.ndarray]:
+        skymaps: tuple[npt.NDArray, npt.NDArray],
+        varmaps: tuple[npt.NDArray, npt.NDArray],
+    ) -> tuple[npt.NDArray, npt.NDArray]:
         """Computes skies SNR."""
         # variance is clipped to improve numerical stability for off-axis sources,
         # which may result in very few counts.

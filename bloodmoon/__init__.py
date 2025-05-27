@@ -42,6 +42,7 @@ For detailed documentation on specific functions, use help() on the individual
 components or refer to the module docstrings.
 """
 
+from .coords import shift2pos
 from .io import simulation
 from .io import simulation_files
 from .mask import chop
@@ -50,7 +51,6 @@ from .mask import count
 from .mask import decode
 from .mask import model_shadowgram
 from .mask import model_sky
-from .mask import shift2pos
 from .mask import snratio
 from .mask import strip
 from .mask import variance
