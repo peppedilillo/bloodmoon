@@ -31,17 +31,6 @@ class CoordHorizontal(NamedTuple):
     al: float
 
 
-class CoordSky(NamedTuple):
-    """Sky-shifts coordinates.
-    Args:
-        shift_x: X coordinate in sky-shift space
-        shift_y: Y coordinate in sky-shift space
-    """
-
-    shift_x: float
-    shift_y: float
-
-
 class BinsRectangular(NamedTuple):
     """Two-dimensional binning structure for rectangular coordinates.
 

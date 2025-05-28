@@ -18,7 +18,6 @@ from .mask import CodedMaskCamera
 from .types import BinsEquatorial
 from .types import BinsRectangular
 from .types import CoordEquatorial
-from .types import CoordSky
 
 
 def shift2pos(camera: CodedMaskCamera, shift_x: float, shift_y: float) -> tuple[int, int]:
@@ -79,10 +78,7 @@ def pos2shift(
     if not (-(n + 1) <= y <= n) or not (-(m + 1) <= x <= m):
         raise IndexError(f"Indexes ({y}, {x}) are out of bound for sky shape {camera.shape_sky}.")
 
-    return CoordSky(
-        camera.bins_sky.x[x],
-        camera.bins_sky.y[y],
-    )
+    return camera.bins_sky.x[x], camera.bins_sky.y[y]
 
 
 def pos2equatorial(

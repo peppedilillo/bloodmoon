@@ -42,7 +42,6 @@ For detailed documentation on specific functions, use help() on the individual
 components or refer to the module docstrings.
 """
 
-from .coords import shift2pos
 from .io import simulation
 from .io import simulation_files
 from .mask import chop
