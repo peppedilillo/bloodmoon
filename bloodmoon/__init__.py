@@ -50,7 +50,6 @@ from .mask import count
 from .mask import decode
 from .mask import model_shadowgram
 from .mask import model_sky
-from .mask import shift2pos
 from .mask import snratio
 from .mask import strip
 from .mask import variance

@@ -9,6 +9,7 @@ This module provides functions to convert between different coordinate systems:
 The transformations account for the instrument geometry and pointing direction.
 """
 
+from bisect import bisect
 import numpy as np
 import numpy.typing as npt
 
@@ -17,6 +18,35 @@ from .mask import CodedMaskCamera
 from .types import BinsEquatorial
 from .types import BinsRectangular
 from .types import CoordEquatorial
+
+
+def shift2pos(camera: CodedMaskCamera, shift_x: float, shift_y: float) -> tuple[int, int]:
+    """
+    Convert continuous sky-shift coordinates to nearest discrete pixel indices.
+
+    Args:
+        camera: CodedMaskCamera instance containing binning information
+        shift_x: x-coordinate in sky-shift space (mm)
+        shift_y: y-coordinate in sky-shift space (mm)
+
+    Returns:
+        Tuple of (row, column) indices in the discrete sky image grid
+
+    Raises:
+        ValueError: If shifts are outside valid range
+    """
+
+    def check_bounds(bins, shift):
+        """Checks shifts validity wrt binning."""
+        return (shift >= bins[0]) and (shift <= bins[-1])
+
+    if not (check_bounds(camera.bins_sky.y, shift_y) and check_bounds(camera.bins_sky.x, shift_x)):
+        raise ValueError("Shifts outside binning boundaries.")
+
+    return (
+        bisect(camera.bins_sky.y, shift_y) - 1,
+        bisect(camera.bins_sky.x, shift_x) - 1,
+    )
 
 
 def pos2shift(
@@ -45,15 +75,10 @@ def pos2shift(
         - negative indexes are allowed.
     """
     n, m = camera.shape_sky
-    if not (-n <= y < n) or not (-m <= x < m):
+    if not (-(n + 1) <= y <= n) or not (-(m + 1) <= x <= m):
         raise IndexError(f"Indexes ({y}, {x}) are out of bound for sky shape {camera.shape_sky}.")
 
-    # bins resemble sky shape
-    binsx = camera.bins_sky.x[:-1]
-    binsy = camera.bins_sky.y[:-1]
-    dbinx = binsx[1] - binsx[0]
-    dbiny = binsy[1] - binsy[0]
-    return binsx[x] + dbinx / 2, binsy[y] + dbiny / 2
+    return camera.bins_sky.x[x], camera.bins_sky.y[y]
 
 
 def pos2equatorial(
