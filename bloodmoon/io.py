@@ -22,45 +22,44 @@ from bloodmoon.types import CoordHorizontal
 
 def _validate_fits(filepath: Path) -> bool:
     """
-    Following astropy's approach, reads the first FITS card (80 bytes)
-    and checks for the SIMPLE keyword signature.
-
+    Checks presence and validity of the FITS file.
     Args:
-        filepath: Path object pointing to the file to validate
-
-    Returns:
-        bool: True if file has a valid FITS signature, False otherwise
-    """
-    try:
-        with open(filepath, "rb") as file:
-            # FITS signature is supposed to be in the first 30 bytes, but to
-            # allow reading various invalid files we will check in the first
-            # card (80 bytes).
-            simple = file.read(80)
-    except OSError:
-        return False
-
-    fits_signature = b"SIMPLE  =                    T"
-
-    match_sig = simple[:29] == fits_signature[:-1] and simple[29:30] in (b"T", b"F")
-    return match_sig
-
-
-def check_fits(filepath: Path) -> bool:
-    """
-    Check presence and validity of the FITS file.
-    Args:
-        filepath (str | Path): Path to the FITS file.
+        filepath: Path to the FITS file.
     
     Returns:
-        output (bool): True if FITS exists and in valid format.
+        output: True if FITS exists and in valid format.
     Raises:
         FileNotFoundError: If FITS file does not exist.
         ValueError: If file not in valid FITS format.
     """
-    if not filepath.is_file():
+    def validate_signature(filepath: Path) -> bool:
+        """
+        Following astropy's approach, reads the first FITS card (80 bytes)
+        and checks for the SIMPLE keyword signature.
+
+        Args:
+            filepath: Path object pointing to the file to validate
+
+        Returns:
+            bool: True if file has a valid FITS signature, False otherwise
+        """
+        try:
+            with open(filepath, "rb") as file:
+                # FITS signature is supposed to be in the first 30 bytes, but to
+                # allow reading various invalid files we will check in the first
+                # card (80 bytes).
+                simple = file.read(80)
+        except OSError:
+            return False
+
+        fits_signature = b"SIMPLE  =                    T"
+
+        match_sig = simple[:29] == fits_signature[:-1] and simple[29:30] in (b"T", b"F")
+        return match_sig
+    
+    if not Path(filepath).is_file():
         raise FileNotFoundError(f"FITS file '{filepath}' does not exist.")
-    elif not _validate_fits(filepath):
+    elif not validate_signature(Path(filepath)):
         raise ValueError("File not in valid FITS format.")
     return True
 
@@ -180,7 +179,7 @@ def simulation(filepath: str | Path) -> SimulationDataLoader:
     Returns:
         a SimulationDataLoader dataclass.
     """
-    if check_fits(Path(filepath)):
+    if _validate_fits(Path(filepath)):
         sdl = SimulationDataLoader(filepath)
     return sdl
 
@@ -298,7 +297,7 @@ def fetch_mask(filepath: str | Path) -> MaskDataLoader:
     Returns:
         a MaskDataLoader dataclass.
     """
-    if check_fits(Path(filepath)):
+    if _validate_fits(Path(filepath)):
         mdl = MaskDataLoader(Path(filepath))
     return mdl
 

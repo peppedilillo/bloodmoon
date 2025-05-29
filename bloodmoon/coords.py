@@ -20,7 +20,11 @@ from .types import BinsRectangular
 from .types import CoordEquatorial
 
 
-def shift2pos(camera: CodedMaskCamera, shift_x: float, shift_y: float) -> tuple[int, int]:
+def shift2pos(
+    camera: CodedMaskCamera, 
+    shift_x: float, 
+    shift_y: float,
+) -> tuple[int, int]:
     """
     Convert continuous sky-shift coordinates to nearest discrete pixel indices.
 
@@ -81,37 +85,41 @@ def pos2shift(
     return camera.bins_sky.x[x], camera.bins_sky.y[y]
 
 
-def shift2theta(camera: CodedMaskCamera, shift: float) -> float:
+def shift2angle(camera: CodedMaskCamera, shift: float) -> float:
     """
-    Convert sky-coordinate shift in respective angular coordinate.
+    Convert sky-coordinate shift in respective angular coordinate in the
+    coded mask camera reference frame.
+    
     Args:
-        camera (CodedMaskCamera): The camera object containing the WFM cameras parameters.
-        shift (float): Sky-coordinate shift.
+        camera: The camera object containing the WFM cameras parameters.
+        shift: Sky-coordinate shift.
     
     Returns:
-        theta (float): Angular sky-coordinate in [deg].
+        angle: Angular sky-coordinate in [deg].
     
     Notes:
         - `shift` must have same physical dimension of mask-detector distance, i.e. [mm].
-        - the distance to compute `theta` is assumed to be mask-detector plus half the mask thickness.
+        - the distance to compute `angle` is assumed to be mask-detector plus half the mask thickness.
     """
     return np.rad2deg(np.arctan(shift / camera.specs["mask_detector_distance"]))
 
 
-def theta2shift(camera: CodedMaskCamera, theta: float) -> float:
+def angle2shift(camera: CodedMaskCamera, angle: float) -> float:
     """
-    Convert angular sky-coordinate in respective shift coordinate.
+    Convert angular sky-coordinate in the coded mask camera reference
+    frame in respective sky-coordinate shift.
+
     Args:
-        camera (CodedMaskCamera): The camera object containing the WFM cameras parameters.
-        theta (float): Angular sky-coordinate in [deg].
+        camera: The camera object containing the WFM cameras parameters.
+        angle: Angular sky-coordinate in [deg].
     
     Returns:
-        shift (float): Sky-coordinate shift in [mm].
+        shift: Sky-coordinate shift in [mm].
     
     Notes:
-        - the distance to compute `theta` is assumed to be mask-detector plus half the mask thickness.
+        - the distance to compute `angle` is assumed to be mask-detector plus half the mask thickness.
     """
-    return camera.specs["mask_detector_distance"] * np.tan(np.deg2rad(theta))
+    return camera.specs["mask_detector_distance"] * np.tan(np.deg2rad(angle))
 
 
 def pos2equatorial(

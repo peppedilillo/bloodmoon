@@ -11,7 +11,7 @@ import bloodmoon as bm
 
 
 @dataclass(frozen=True)
-class MiniSDL:
+class DummySDL:
     """Test SimulationDataLoader instance with camera pointing."""
 
     CAMZRA: float
@@ -36,7 +36,7 @@ class TestEquatorial2Shift(unittest.TestCase):
 
     def setUp(self):
         self.wfm = bm.codedmask(_path_test_mask, upscale_x=3, upscale_y=3)
-        self.sdl = MiniSDL(
+        self.sdl = DummySDL(
             CAMZRA=266.4,
             CAMZDEC=-28.94,
             CAMXRA=266.4,

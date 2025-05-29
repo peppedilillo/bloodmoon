@@ -234,7 +234,7 @@ class CodedMaskCamera:
         """2D array representing the coded mask pattern."""
         return _enlarge(
             _fold(self.mdl.mask, self._bins_mask(UpscaleFactor(1, 1))).astype(int),
-            self.upscale_f,
+            *self.upscale_f,
         )
 
     @cached_property
@@ -242,7 +242,7 @@ class CodedMaskCamera:
         """2D array representing the mask pattern used for decoding."""
         return _enlarge(
             _fold(self.mdl.decoder, self._bins_mask(UpscaleFactor(1, 1))),
-            self.upscale_f,
+            *self.upscale_f,
         )
 
     @cached_property
@@ -253,7 +253,7 @@ class CodedMaskCamera:
         bins = self._bins_mask(self.upscale_f)
         xmin, xmax = _bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
         ymin, ymax = _bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
-        return _enlarge(framed_bulk, self.upscale_f)[ymin:ymax, xmin:xmax]
+        return _enlarge(framed_bulk, *self.upscale_f)[ymin:ymax, xmin:xmax]
 
     @cached_property
     def balancing(self) -> npt.NDArray:
