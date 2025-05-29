@@ -1,13 +1,14 @@
-import unittest
 from dataclasses import dataclass
+import unittest
 
 import numpy as np
 
-from bloodmoon.assets import _path_test_mask
-from bloodmoon.types import CoordEquatorial
-from bloodmoon.coords import shift2equatorial, equatorial2shift
-from bloodmoon.coords import _rotation_matrices
 import bloodmoon as bm
+from bloodmoon.assets import _path_test_mask
+from bloodmoon.coords import _rotation_matrices
+from bloodmoon.coords import equatorial2shift
+from bloodmoon.coords import shift2equatorial
+from bloodmoon.types import CoordEquatorial
 
 
 @dataclass(frozen=True)

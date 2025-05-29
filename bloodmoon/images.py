@@ -45,7 +45,7 @@ def _upscale(
           off, since there is no "scaling". A better name would be `enlarge` or
           similar. However, we used it for naming variables and parameters in
           many places so we are keeping it, for now.
-    """    
+    """
     for ax, factor in enumerate((upscale_y, upscale_x)):
         m = np.repeat(m, factor, axis=ax)
     return m

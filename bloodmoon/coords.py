@@ -10,6 +10,7 @@ The transformations account for the instrument geometry and pointing direction.
 """
 
 from bisect import bisect
+
 import numpy as np
 import numpy.typing as npt
 
@@ -21,8 +22,8 @@ from .types import CoordEquatorial
 
 
 def shift2pos(
-    camera: CodedMaskCamera, 
-    shift_x: float, 
+    camera: CodedMaskCamera,
+    shift_x: float,
     shift_y: float,
 ) -> tuple[int, int]:
     """
@@ -89,18 +90,18 @@ def shift2angle(camera: CodedMaskCamera, shift: float) -> float:
     """
     Convert sky-coordinate shift in respective angular coordinate in the
     coded mask camera reference frame.
-    
+
     Args:
         camera: The camera object containing the WFM cameras parameters.
         shift: Sky-coordinate shift.
-    
+
     Returns:
         angle: Angular sky-coordinate in [deg].
 
     Usage:
         If the shift is measured in the x direction, the returned angle is
         the declination of the sky-versor projection onto the xz plane.
-    
+
     Notes:
         - `shift` must have same physical dimension of mask-detector distance, i.e. [mm].
         - the distance to compute `angle` is assumed to be mask-detector plus half the mask thickness.
@@ -116,7 +117,7 @@ def angle2shift(camera: CodedMaskCamera, angle: float) -> float:
     Args:
         camera: The camera object containing the WFM cameras parameters.
         angle: Angular sky-coordinate in [deg].
-    
+
     Returns:
         shift: Sky-coordinate shift in [mm].
 

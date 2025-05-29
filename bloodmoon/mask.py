@@ -134,8 +134,7 @@ class CodedMaskCamera:
 
     @cached_property
     def shape_mask(self) -> tuple[int, int]:
-        """Shape of the mask array (rows, columns).
-        """
+        """Shape of the mask array (rows, columns)."""
         # there is no need for this since we can just `mask.shape` but since we have the other already..
         return (
             int((self.mdl["mask_maxy"] - self.mdl["mask_miny"]) / (self.mdl["mask_deltay"] / self.upscale_f.y)),

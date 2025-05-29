@@ -25,13 +25,14 @@ def _exists_valid(filepath: Path) -> bool:
     Checks presence and validity of the FITS file.
     Args:
         filepath: Path to the FITS file.
-    
+
     Returns:
         output: True if FITS exists and in valid format.
     Raises:
         FileNotFoundError: If FITS file does not exist.
         ValueError: If file not in valid FITS format.
     """
+
     def validate_signature(filepath: Path) -> bool:
         """
         Following astropy's approach, reads the first FITS card (80 bytes)
@@ -56,7 +57,7 @@ def _exists_valid(filepath: Path) -> bool:
 
         match_sig = simple[:29] == fits_signature[:-1] and simple[29:30] in (b"T", b"F")
         return match_sig
-    
+
     if not Path(filepath).is_file():
         raise FileNotFoundError(f"FITS file '{filepath}' does not exist.")
     elif not validate_signature(Path(filepath)):
