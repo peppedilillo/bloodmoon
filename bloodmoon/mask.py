@@ -30,7 +30,7 @@ from .images import _interp
 from .images import _rbilinear_relative
 from .images import _shift
 from .images import _unframe
-from .images import _enlarge
+from .images import _upscale
 from .images import argmax
 from .io import MaskDataLoader
 from .types import BinsRectangular
@@ -232,7 +232,7 @@ class CodedMaskCamera:
     @cached_property
     def mask(self) -> npt.NDArray:
         """2D array representing the coded mask pattern."""
-        return _enlarge(
+        return _upscale(
             _fold(self.mdl.mask, self._bins_mask(UpscaleFactor(1, 1))).astype(int),
             *self.upscale_f,
         )
@@ -240,7 +240,7 @@ class CodedMaskCamera:
     @cached_property
     def decoder(self) -> npt.NDArray:
         """2D array representing the mask pattern used for decoding."""
-        return _enlarge(
+        return _upscale(
             _fold(self.mdl.decoder, self._bins_mask(UpscaleFactor(1, 1))),
             *self.upscale_f,
         )
@@ -253,7 +253,7 @@ class CodedMaskCamera:
         bins = self._bins_mask(self.upscale_f)
         xmin, xmax = _bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
         ymin, ymax = _bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
-        return _enlarge(framed_bulk, *self.upscale_f)[ymin:ymax, xmin:xmax]
+        return _upscale(framed_bulk, *self.upscale_f)[ymin:ymax, xmin:xmax]
 
     @cached_property
     def balancing(self) -> npt.NDArray:

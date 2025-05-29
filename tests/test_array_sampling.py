@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from bloodmoon.images import _enlarge
+from bloodmoon.images import _upscale
 
 
 class TestSampling(unittest.TestCase):
@@ -12,7 +12,7 @@ class TestSampling(unittest.TestCase):
         a = np.random.uniform(0, 10, (n, m))
 
         fy, fx = 4, 3
-        b = _enlarge(a, fx, fy)
+        b = _upscale(a, fx, fy)
 
         # testing upscaled array shape
         self.assertEqual(b.shape, (n * fy, m * fx))

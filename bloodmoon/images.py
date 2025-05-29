@@ -24,7 +24,7 @@ from .types import BinsRectangular
 from .types import UpscaleFactor
 
 
-def _enlarge(
+def _upscale(
     m: npt.NDArray,
     upscale_x: int,
     upscale_y: int,
@@ -41,7 +41,10 @@ def _enlarge(
         output: Oversampled array.
 
     Notes:
-        - the total sum is NOT conserved.
+        - the total sum is NOT conserved. Hence the function name is somewhat
+          off, since there is no "scaling". A better name would be `enlarge` or
+          similar. However, we used it for naming variables and parameters in
+          many places so we are keeping it, for now.
     """    
     for ax, factor in enumerate((upscale_y, upscale_x)):
         m = np.repeat(m, factor, axis=ax)

@@ -20,7 +20,7 @@ from bloodmoon.types import CoordEquatorial
 from bloodmoon.types import CoordHorizontal
 
 
-def _validate_fits(filepath: Path) -> bool:
+def _exists_valid(filepath: Path) -> bool:
     """
     Checks presence and validity of the FITS file.
     Args:
@@ -179,7 +179,7 @@ def simulation(filepath: str | Path) -> SimulationDataLoader:
     Returns:
         a SimulationDataLoader dataclass.
     """
-    if _validate_fits(Path(filepath)):
+    if _exists_valid(Path(filepath)):
         sdl = SimulationDataLoader(filepath)
     return sdl
 
@@ -297,7 +297,7 @@ def fetch_mask(filepath: str | Path) -> MaskDataLoader:
     Returns:
         a MaskDataLoader dataclass.
     """
-    if _validate_fits(Path(filepath)):
+    if _exists_valid(Path(filepath)):
         mdl = MaskDataLoader(Path(filepath))
     return mdl
 

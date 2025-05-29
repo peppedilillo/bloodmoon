@@ -96,6 +96,10 @@ def shift2angle(camera: CodedMaskCamera, shift: float) -> float:
     
     Returns:
         angle: Angular sky-coordinate in [deg].
+
+    Usage:
+        If the shift is measured in the x direction, the returned angle is
+        the declination of the sky-versor projection onto the xz plane.
     
     Notes:
         - `shift` must have same physical dimension of mask-detector distance, i.e. [mm].
@@ -115,7 +119,11 @@ def angle2shift(camera: CodedMaskCamera, angle: float) -> float:
     
     Returns:
         shift: Sky-coordinate shift in [mm].
-    
+
+    Usage:
+        If the angle is the declination of the sky-versor projection on the
+        the xz plane, returns the shift in the x direction.
+
     Notes:
         - the distance to compute `angle` is assumed to be mask-detector plus half the mask thickness.
     """
