@@ -1,9 +1,11 @@
 import unittest
+
 import numpy as np
 
 from bloodmoon.assets import _path_test_mask
+from bloodmoon.coords import pos2shift
+from bloodmoon.coords import shift2pos
 from bloodmoon.mask import codedmask
-from bloodmoon.coords import shift2pos, pos2shift
 
 
 class TestShift2Pos(unittest.TestCase):

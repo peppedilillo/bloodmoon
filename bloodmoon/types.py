@@ -3,6 +3,7 @@ Custom data types and containers for the WFM analysis pipeline.
 """
 
 from typing import NamedTuple
+
 import numpy.typing as npt
 
 

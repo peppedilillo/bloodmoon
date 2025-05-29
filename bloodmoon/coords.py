@@ -10,6 +10,7 @@ The transformations account for the instrument geometry and pointing direction.
 """
 
 from bisect import bisect
+
 import numpy as np
 import numpy.typing as npt
 
@@ -20,7 +21,11 @@ from .types import BinsRectangular
 from .types import CoordEquatorial
 
 
-def shift2pos(camera: CodedMaskCamera, shift_x: float, shift_y: float) -> tuple[int, int]:
+def shift2pos(
+    camera: CodedMaskCamera,
+    shift_x: float,
+    shift_y: float,
+) -> tuple[int, int]:
     """
     Convert continuous sky-shift coordinates to nearest discrete pixel indices.
 
@@ -79,6 +84,51 @@ def pos2shift(
         raise IndexError(f"Indexes ({y}, {x}) are out of bound for sky shape {camera.shape_sky}.")
 
     return camera.bins_sky.x[x], camera.bins_sky.y[y]
+
+
+def shift2angle(camera: CodedMaskCamera, shift: float) -> float:
+    """
+    Convert sky-coordinate shift in respective angular coordinate in the
+    coded mask camera reference frame.
+
+    Args:
+        camera: The camera object containing the WFM cameras parameters.
+        shift: Sky-coordinate shift.
+
+    Returns:
+        angle: Angular sky-coordinate in [deg].
+
+    Usage:
+        If the shift is measured in the x direction, the returned angle is
+        the declination of the sky-versor projection onto the xz plane.
+
+    Notes:
+        - `shift` must have same physical dimension of mask-detector distance, i.e. [mm].
+        - the distance to compute `angle` is assumed to be mask-detector plus half the mask thickness.
+    """
+    return np.rad2deg(np.arctan(shift / camera.specs["mask_detector_distance"]))
+
+
+def angle2shift(camera: CodedMaskCamera, angle: float) -> float:
+    """
+    Convert angular sky-coordinate in the coded mask camera reference
+    frame in respective sky-coordinate shift.
+
+    Args:
+        camera: The camera object containing the WFM cameras parameters.
+        angle: Angular sky-coordinate in [deg].
+
+    Returns:
+        shift: Sky-coordinate shift in [mm].
+
+    Usage:
+        If the angle is the declination of the sky-versor projection on the
+        the xz plane, returns the shift in the x direction.
+
+    Notes:
+        - the distance to compute `angle` is assumed to be mask-detector plus half the mask thickness.
+    """
+    return camera.specs["mask_detector_distance"] * np.tan(np.deg2rad(angle))
 
 
 def pos2equatorial(
@@ -183,6 +233,81 @@ def _shift2equatorial(
     dec = np.rad2deg(dec)
     ra = np.rad2deg(ra)
     return CoordEquatorial(*map(float, (ra, dec)))
+
+
+def equatorial2shift(
+    sdl: SimulationDataLoader,
+    camera: CodedMaskCamera,
+    ra: float,
+    dec: float,
+) -> tuple[float, float]:
+    """
+    Convert equatorial coordinates (RA/Dec) to sky-shift coordinates for a specific camera.
+    Args:
+        sdl: SimulationDataLoader containing camera pointings
+        camera: CodedMaskCamera object containing mask pattern and mask-detector distance
+        ra: Right ascension in degrees [0, 360]
+        dec: Declination in degrees [-90, 90]
+    Returns:
+        A tuple of float containing:
+            - shift x: X coordinate in sky-shift space [mm]
+            - shift y: Y coordinate in sky-shift space [mm]
+    Notes:
+        - Input coordinates and distance must use consistent units
+        - Zero point in sky-shift space is the optical axis
+    """
+    return _equatorial2shift(
+        ra,
+        dec,
+        sdl.pointings["z"],
+        sdl.pointings["x"],
+        camera.specs["mask_detector_distance"],
+    )
+
+
+def _equatorial2shift(
+    ra: float,
+    dec: float,
+    pointing_radec_z: CoordEquatorial,
+    pointing_radec_x: CoordEquatorial,
+    distance_detector_mask: float,
+) -> tuple[float, float]:
+    """
+    Implementation to `equatorial2shift()`.
+    Args:
+        ra: Right ascension in degrees [0, 360]
+        dec: Declination in degrees [-90, 90]
+        pointing_radec_z: Pointing direction of the detector's z-axis in
+            (RA, Dec) coordinates in degrees.
+        pointing_radec_x: Pointing direction of the detector's x-axis in
+            (RA, Dec) coordinates in degrees. Used to define the detector's roll angle.
+        distance_detector_mask: Distance between the detector and mask planes in the same
+            spatial units as midpoints_xs and midpoints_ys.
+    Returns:
+        A tuple of float containing:
+            - shift_x: X coordinate on the sky-shift plane in spatial units.
+                Dimension should match shift_y and distance_detector_mask.
+            - shift_y: X coordinate on the sky-shift plane in spatial units.
+                Dimension should match shift_x and distance_detector_mask.
+    """
+    rotmat_sky2cam, _ = _rotation_matrices(
+        pointing_radec_z,
+        pointing_radec_x,
+    )
+    ra = np.deg2rad(ra)
+    dec = np.deg2rad(dec)
+    w = np.array(
+        [
+            np.cos(ra) * np.cos(dec),
+            np.sin(ra) * np.cos(dec),
+            np.sin(dec),
+        ]
+    )
+    vx, vy, vz = np.matmul(rotmat_sky2cam, w)
+    # the sky-shifts are computed from the versor `v` using the mask-detector distance
+    shift_x = vx * distance_detector_mask / vz
+    shift_y = vy * distance_detector_mask / vz
+    return map(float, (shift_x, shift_y))
 
 
 def _rotation_matrices(

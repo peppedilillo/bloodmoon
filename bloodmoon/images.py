@@ -24,34 +24,30 @@ from .types import BinsRectangular
 from .types import UpscaleFactor
 
 
-def upscale(
+def _upscale(
     m: npt.NDArray,
-    upscale_x: int = 1,
-    upscale_y: int = 1,
-) -> np.ndarray:
-    """Upscale a 2D array by repeating elements along each axis.
+    upscale_x: int,
+    upscale_y: int,
+) -> npt.NDArray:
+    """
+    Oversamples a 2D array by repeating elements along the axes.
 
     Args:
-        m: Input 2D array
-        upscale_x: upscaling factor over the x direction
-        upscale_y: upscaling factor over the y direction
+        m: Input 2D array.
+        upscale_x: Upscaling factor along the x-axis.
+        upscale_y: Upscaling factor along the y-axis.
 
     Returns:
-        Upscaled array with dimensions multiplied by respective scaling factors
+        output: Oversampled array.
 
-    Raises:
-        ValueError: for invalid upscale factors (everything but positive integers).
+    Notes:
+        - the total sum is NOT conserved. Hence the function name is somewhat
+          off, since there is no "scaling". A better name would be `enlarge` or
+          similar. However, we used it for naming variables and parameters in
+          many places so we are keeping it, for now.
     """
-    if not ((isinstance(upscale_x, int) and upscale_x > 0) and (isinstance(upscale_y, int) and upscale_y > 0)):
-        raise ValueError("Upscale factors must be positive integers.")
-
-    # VERY careful here, the next is not a typo.
-    # if i'm upscaling by (2, 1). it means i'm doubling the elements
-    # over the x direction, while keeping the same element over the y direction.
-    # this means doubling the number of columns in the mask array, while
-    # keeping the number of rows the same.
-    m = np.repeat(m, upscale_y, axis=0)
-    m = np.repeat(m, upscale_x, axis=1)
+    for ax, factor in enumerate((upscale_y, upscale_x)):
+        m = np.repeat(m, factor, axis=ax)
     return m
 
 
@@ -87,8 +83,8 @@ def compose(
                    N+C+S ==  rotated(`b`)
 
     Args:
-        a (ndarray): First input matrix of shape (n,m) where n < m
-        b (ndarray): Second input matrix of same shape as `a`
+        a: First input matrix of shape (n,m) where n < m
+        b: Second input matrix of same shape as `a`
         strict: if True raises an error if matrices have odd rows and even columns,
                 or viceversa.
 

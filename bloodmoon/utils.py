@@ -8,7 +8,7 @@ from typing import Callable
 
 
 @contextmanager
-def clock(label: str, write: Callable = print) -> Callable[[], float]:
+def clock(label: str, write: Callable = print):
     """A context manager for measuring processing times."""
     t1 = t2 = perf_counter()
     yield lambda: t2 - t1
