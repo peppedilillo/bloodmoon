@@ -4,8 +4,72 @@ Data filters for photons energy range, sources flux and sources positions.
 
 from collections.abc import Sequence
 
-import numpy.typing as npt
 import numpy as np
+import numpy.typing as npt
+
+from .types import CoordEquatorial
+
+
+def filter_data(
+    data: np.recarray,
+    *,
+    E_min: int | float | None,
+    E_max: int | float | None,
+    coords: CoordEquatorial | Sequence[CoordEquatorial] | None,
+) -> np.recarray:
+    """
+    Filters the input `data` record based on the photons energy
+    and/or incoming direction.
+    
+    Args:
+        data (np.recarray):
+            Input simulated data container.
+        E_min (int | float | None):
+            Minimum photons energy in [keV] for the data filtering.
+        E_max (int | float | None):
+            Maximum photons energy in [keV] for the data filtering.
+        coords (CoordEquatorial | Sequence[CoordEquatorial] | None):
+            Input photons RA/Dec in [deg] to filter out.
+    
+    Returns:
+        output: Output filtered data container.
+    """
+    def make_mask(
+        emin: int | float | None,
+        emax: int | float | None,
+        coords: CoordEquatorial | Sequence[CoordEquatorial] | None,
+    ) -> npt.NDArray[np.bool]:
+        """Generates mask for the input data."""
+        energy_mask = np.ones(len(data), dtype=bool)
+        coords_mask = np.ones(len(data), dtype=bool)
+
+        if any(emin, emax):
+            if emin is None: emin = 0
+            if emax is None: emax = np.inf
+            energy_mask &= (data["ENERGY"] > emin & data["ENERGY"] < emax)
+
+        if coords:
+            for c in coords:
+                coords_mask &= ~(
+                    np.isclose(data["RA"], c.ra, atol=1e-7) &
+                    np.isclose(data["DEC"], c.dec, atol=1e-7)
+                )
+        
+        return energy_mask & coords_mask
+
+    if not any((E_min, E_max, coords)):
+        return data
+    mask = make_mask(E_min, E_max, coords)
+    return data[mask]
+
+
+
+
+
+
+
+
+
 
 
 def data_filter(
@@ -66,6 +130,25 @@ def data_filter(
             mask &= _cmask
     
     return record[mask]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def flux_filter(
