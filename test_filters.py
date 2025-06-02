@@ -6,8 +6,10 @@ import unittest
 from unittest import TestCase
 
 import numpy as np
-from bloodmoon.filtering import data_filter
-from bloodmoon.filtering import flux_filter, source_filter, catalog_filter
+from filtering import filter_data
+from filtering import flux_filter, source_filter, catalog_filter
+
+from bloodmoon.types import CoordEquatorial
 
 
 class TestFilters(TestCase):
@@ -59,11 +61,12 @@ class TestFilters(TestCase):
 
 
     def test_data_energy_filter(self):
-        """Tests for `data_filter()` in the energy channel."""
-        energy_range = 30
-        filtered_data = data_filter(
-            record=self.data,
-            energy_range=energy_range,
+        """Tests for `filter_data()` in the energy channel."""
+        E_min, E_max = None, 30
+        filtered_data = filter_data(
+            data=self.data,
+            E_min=E_min,
+            E_max=E_max,
             coords=None,
         )
 
@@ -79,10 +82,11 @@ class TestFilters(TestCase):
             np.sort(target, order="ENERGY"),
         )
 
-        energy_range = (25, 45)
-        filtered_data = data_filter(
-            record=self.data,
-            energy_range=energy_range,
+        E_min, E_max = (25, 45)
+        filtered_data = filter_data(
+            data=self.data,
+            E_min=E_min,
+            E_max=E_max,
             coords=None,
         )
 
@@ -101,11 +105,12 @@ class TestFilters(TestCase):
         )
 
     def test_data_coords_filter(self):
-        """Tests for `data_filter()` in the RA/Dec channel."""
-        coords = (201.365, -43.019)
-        filtered_data = data_filter(
-            record=self.data,
-            energy_range=None,
+        """Tests for `filter_data()` in the RA/Dec channel."""
+        coords = CoordEquatorial(ra=201.365, dec=-43.019)
+        filtered_data = filter_data(
+            data=self.data,
+            E_min=None,
+            E_max=None,
             coords=coords,
         )
 
@@ -127,13 +132,14 @@ class TestFilters(TestCase):
         )
 
         coords = [
-            (299.868,  40.733),
-            (123.456, -10.123),
-            (83.822,  -5.391),
+            CoordEquatorial(ra=299.868, dec=40.733),
+            CoordEquatorial(ra=123.456, dec=-10.123),
+            CoordEquatorial(ra=83.822,  dec=-5.391),
         ]
-        filtered_data = data_filter(
-            record=self.data,
-            energy_range=None,
+        filtered_data = filter_data(
+            data=self.data,
+            E_min=None,
+            E_max=None,
             coords=coords,
         )
 
@@ -152,17 +158,18 @@ class TestFilters(TestCase):
             np.sort(target, order="ENERGY"),
         )
 
-    def test_data_filter(self):
-        """Tests for `data_filter()`."""
-        energy_range = (25, 45)
+    def test_filter_data(self):
+        """Tests for `filter_data()`."""
+        E_min, E_max = (25, 45)
         coords = [
-            (299.868,  40.733),
-            (123.456, -10.123),
-            (83.822,  -5.391),
+            CoordEquatorial(ra=299.868, dec=40.733),
+            CoordEquatorial(ra=123.456, dec=-10.123),
+            CoordEquatorial(ra=83.822,  dec=-5.391),
         ]
-        filtered_data = data_filter(
-            record=self.data,
-            energy_range=energy_range,
+        filtered_data = filter_data(
+            data=self.data,
+            E_min=E_min,
+            E_max=E_max,
             coords=coords,
         )
 
@@ -180,8 +187,8 @@ class TestFilters(TestCase):
 
     def test_catalog_flux_filter(self):
         """Tests for `flux_filter()`."""
-        flux_range = 30
-        target = np.rec.array([
+        flux_range1 = (30, None)
+        target1 = np.rec.array([
             ('SRC_C', 87.2, 143),
             ('SRC_E', 56.7, 87),
             ('SRC_G', 71.8, 77),
@@ -190,13 +197,28 @@ class TestFilters(TestCase):
         ], dtype=[('NAME', 'U10'), ('FLUX', 'f8'), ('NPHOTONS', 'i4')])
 
         np.testing.assert_array_equal(
-            np.sort(flux_filter(self.catalog, flux_range), order="FLUX"),
-            np.sort(target, order="FLUX"),
+            np.sort(flux_filter(self.catalog, *flux_range1), order="FLUX"),
+            np.sort(target1, order="FLUX"),
         )
 
-        flux_range = (20, 90)
-        target = np.rec.array([
-            ('SRC_C', 87.2, 143),
+        flux_range2 = (None, 60)
+        target2 = np.rec.array([
+            ('SRC_A', 12.4, 120),
+            ('SRC_B', 3.5, 98),
+            ('SRC_D', 0.95, 65),
+            ('SRC_E', 56.7, 87),
+            ('SRC_F', 23.1, 132),
+            ('SRC_I', 14.6, 101),
+            ('SRC_J', 42.3, 110),
+        ], dtype=[('NAME', 'U10'), ('FLUX', 'f8'), ('NPHOTONS', 'i4')])
+
+        np.testing.assert_array_equal(
+            np.sort(flux_filter(self.catalog, *flux_range2), order="FLUX"),
+            np.sort(target2, order="FLUX"),
+        )
+
+        flux_range3 = (20, 80)
+        target3 = np.rec.array([
             ('SRC_E', 56.7, 87),
             ('SRC_F', 23.1, 132),
             ('SRC_G', 71.8, 77),
@@ -204,8 +226,8 @@ class TestFilters(TestCase):
         ], dtype=[('NAME', 'U10'), ('FLUX', 'f8'), ('NPHOTONS', 'i4')])
 
         np.testing.assert_array_equal(
-            np.sort(flux_filter(self.catalog, flux_range), order="FLUX"),
-            np.sort(target, order="FLUX"),
+            np.sort(flux_filter(self.catalog, *flux_range3), order="FLUX"),
+            np.sort(target3, order="FLUX"),
         )
 
     def test_catalog_sources_filter(self):
@@ -279,10 +301,10 @@ class TestFilters(TestCase):
 
         # test for ValueError when both `n` and `flux_range` are given
         with self.assertRaises(ValueError):
-            catalog_filter(self.catalog, n, flux_range)
+            catalog_filter(self.catalog, n=n, flux_range=flux_range)
         
         # test for `n`
-        filtered = catalog_filter(self.catalog, n)
+        filtered = catalog_filter(self.catalog, n=n)
         target = np.rec.array([
             ('SRC_A', 12.4, 120),
             ('SRC_I', 14.6, 101),
