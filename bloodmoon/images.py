@@ -414,6 +414,11 @@ def _erosion(
     """
     2D matrix erosion for simulating finite thickness effect in shadow projections.
     It takes a mask array and "thins" the mask elements across the columns' direction.
+    The erosion is performed only on the correct side of open mask elements:\n
+        - right side, if cut is negative (negative angle wrt camera optical axis)
+        - left side, if cut is positive (positive angle wrt camera optical axis)
+    The function erodes all integer bins (replacing 1s with 0s). If cut is not integer,
+    then the function applies a fractional transparency to the last eroded bin.
 
     Comes with NO safeguards: setting cuts larger than step may remove slits or make them negative.
 
@@ -452,36 +457,20 @@ def _erosion(
     """
     if not np.issubdtype(arr.dtype, np.integer):
         raise ValueError("Input array must be of integer type.")
+    
+    # number of bins to cut
+    ncuts = int(cut / step)
+    cutted = arr * (arr & _shift(arr, (0, ncuts))) if ncuts else arr
 
-    # how many bins, summing on both sides, should we cut?
-    ncuts = cut / step
-    # remove as many bins as we can by shifting
-    nshifts = int(ncuts // 2)
-    if nshifts:
-        rshift = _shift(arr, (0, +nshifts))
-        lshift = _shift(arr, (0, -nshifts))
-        arr_ = arr * ((rshift > 0) & (lshift > 0))
-    else:
-        arr_ = arr
-
-    # fix borders
-    decimal = ncuts - 2 * nshifts
-
-    # this is why we only accept integer array inputs.
-    _lborder_mask = arr_ - _shift(arr_, (0, +1)) > 0
-    _rborder_mask = arr_ - _shift(arr_, (0, -1)) > 0
-    lborder_mask = _lborder_mask & (~_rborder_mask)
-    rborder_mask = _rborder_mask & (~_lborder_mask)
-    cborder_mask = _lborder_mask & _rborder_mask
-
-    # fmt: off
-    return (
-        arr_ +
-        (1 - decimal / 2) * lborder_mask - arr_ * lborder_mask +
-        (1 - decimal / 2) * rborder_mask - arr_ * rborder_mask +
-        (1 - decimal) * cborder_mask - arr_ * cborder_mask
+    # array indexes to be fractionally reduced:
+    #   - the bin with the decimal values is the one
+    #     to the left or right wrt the cutted bins
+    erosion_value = abs(cut / step - ncuts)
+    border = (
+        (cutted - _shift(cutted, (0, int(np.sign(cut))))) > 0
     )
-    # fmt: on
+    
+    return cutted - border * erosion_value
 
 
 def _unframe(a: npt.NDArray, value: float = 0.0) -> npt.NDArray:
