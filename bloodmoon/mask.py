@@ -540,8 +540,8 @@ _PSFX_WFM_PARAMS = {
 }
 _PSFY_WFM_PARAMS = {
     "center": 0,
-    "alpha": 0.2592,
-    "beta": 0.5972,
+    "alpha": 0.3214,
+    "beta": 0.6246,
 }
 
 
@@ -608,11 +608,25 @@ def apply_vignetting(
     shift_x: float,
     shift_y: float,
 ) -> npt.NDArray:
-    """
+    r"""
     Apply vignetting effects to a shadowgram based on source position.
     Vignetting occurs when mask thickness causes partial shadowing at off-axis angles.
     This function models this effect by applying erosion operations in both x and y
     directions based on the source's angular displacement from the optical axis.
+
+    
+                                    <--------> MASK APERTURE
+
+                                  \       \  \ 
+                        ___________\       \  \____________
+                                   |\       \ |             MASK ELEMENT
+                        ___________| \       \|_____________
+                                      \       \  \ 
+                                       \       \  \ 
+                                        \       \  \ 
+                         ________________\_______\__\_________  DETECTOR
+                         <--------------->        <->
+                               SHIFT             EROSION   
 
     Args:
         camera: CodedMaskCamera instance containing mask and detector geometry
@@ -632,13 +646,14 @@ def apply_vignetting(
     """
     bins = camera.bins_detector
 
-    angle_x_rad = abs(np.arctan(shift_x / camera.mdl["mask_detector_distance"]))
+    angle_x_rad = np.arctan(shift_x / camera.mdl["detector_topmask_dist"])
     red_factor = camera.mdl["mask_thickness"] * np.tan(angle_x_rad)
     sg1 = _erosion(shadowgram, bins.x[1] - bins.x[0], red_factor)
 
-    angle_y_rad = abs(np.arctan(shift_y / camera.mdl["mask_detector_distance"]))
+    angle_y_rad = np.arctan(shift_y / camera.mdl["detector_topmask_dist"])
     red_factor = camera.mdl["mask_thickness"] * np.tan(angle_y_rad)
     sg2 = _erosion(shadowgram.T, bins.y[1] - bins.y[0], red_factor)
+    
     return sg1 * sg2.T
 
 
