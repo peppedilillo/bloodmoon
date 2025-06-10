@@ -9,10 +9,6 @@ class TestErosion(unittest.TestCase):
 
     def assertArrayAlmostEqual(self, x, y) -> bool:
         return np.testing.assert_array_almost_equal(x, y, decimal=2)
-    
-    def erosion_value(self, cut, step) -> float:
-        return 1 - divmod(abs(cut / step), 1)[1]
-
 
     def test_basic_erosion_1(self):
         arr = np.array(
@@ -26,12 +22,11 @@ class TestErosion(unittest.TestCase):
 
         # test positive cut
         cut = 0.25
-        e = self.erosion_value(cut, step)
         expected = np.array(
             [
-                [e, 1, 1, 0, 0, 0, e],
-                [e, 1, 1, 0, 0, 0, e],
-                [e, 1, 1, 0, 0, 0, e],
+                [0.5, 1, 1, 0, 0, 0, 0.5],
+                [0.5, 1, 1, 0, 0, 0, 0.5],
+                [0.5, 1, 1, 0, 0, 0, 0.5],
             ],
             dtype=float,
         )
@@ -42,12 +37,11 @@ class TestErosion(unittest.TestCase):
 
         # test negative cut
         cut = -0.25
-        e = self.erosion_value(cut, step)
         expected = np.array(
             [
-                [1, 1, e, 0, 0, 0, e],
-                [1, 1, e, 0, 0, 0, e],
-                [1, 1, e, 0, 0, 0, e],
+                [1, 1, 0.5, 0, 0, 0, 0.5],
+                [1, 1, 0.5, 0, 0, 0, 0.5],
+                [1, 1, 0.5, 0, 0, 0, 0.5],
             ],
             dtype=float,
         )
@@ -68,12 +62,11 @@ class TestErosion(unittest.TestCase):
 
         # test positive cut
         cut = 4.5
-        e = self.erosion_value(cut, step)
         expected = np.array(
             [
-                [0, 0, 0, 0, 0, 0, e, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, e],
-                [0, 0, 0, 0, 0, 0, e, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, e],
-                [0, 0, 0, 0, 0, 0, e, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, e],
+                [0, 0, 0, 0, 0, 0, 0.5, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5],
+                [0, 0, 0, 0, 0, 0, 0.5, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5],
+                [0, 0, 0, 0, 0, 0, 0.5, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5],
             ],
             dtype=float,
         )
@@ -84,12 +77,11 @@ class TestErosion(unittest.TestCase):
 
         # test negative cut
         cut = -4.5
-        e = self.erosion_value(cut, step)
         expected = np.array(
             [
-                [0, 0, 1, 1, e, 0, 0, 0, 0, 0, 0, 0, 0, 0, e, 0, 0, 0, 0],
-                [0, 0, 1, 1, e, 0, 0, 0, 0, 0, 0, 0, 0, 0, e, 0, 0, 0, 0],
-                [0, 0, 1, 1, e, 0, 0, 0, 0, 0, 0, 0, 0, 0, e, 0, 0, 0, 0],
+                [0, 0, 1, 1, 0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0, 0],
+                [0, 0, 1, 1, 0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0, 0],
+                [0, 0, 1, 1, 0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0, 0],
             ],
             dtype=float,
         )
@@ -110,12 +102,11 @@ class TestErosion(unittest.TestCase):
 
         # test positive cut
         cut = 0.45
-        e = self.erosion_value(cut, step)
         expected = np.array(
             [
-                [0, 0, e, 0, 0, 0],
-                [0, 0, e, 0, 0, 0],
-                [0, 0, e, 0, 0, 0],
+                [0, 0, 0.09999, 0, 0, 0],
+                [0, 0, 0.09999, 0, 0, 0],
+                [0, 0, 0.09999, 0, 0, 0],
             ],
             dtype=float,
         )
@@ -126,12 +117,11 @@ class TestErosion(unittest.TestCase):
 
         # test negative cut
         cut = -0.45
-        e = self.erosion_value(cut, step)
         expected = np.array(
             [
-                [0, 0, e, 0, 0, 0],
-                [0, 0, e, 0, 0, 0],
-                [0, 0, e, 0, 0, 0],
+                [0, 0, 0.09999, 0, 0, 0],
+                [0, 0, 0.09999, 0, 0, 0],
+                [0, 0, 0.09999, 0, 0, 0],
             ],
             dtype=float,
         )
@@ -152,12 +142,11 @@ class TestErosion(unittest.TestCase):
 
         # test positive cut
         cut = 0.5
-        e = self.erosion_value(cut, step)
         expected = np.array(
             [
-                [0, 0, e, 1, 0, 0],
-                [0, 0, e, 1, 0, 0],
-                [0, 0, e, 1, 0, 0],
+                [0, 0, 0.5, 1, 0, 0],
+                [0, 0, 0.5, 1, 0, 0],
+                [0, 0, 0.5, 1, 0, 0],
             ],
             dtype=float,
         )
@@ -168,12 +157,11 @@ class TestErosion(unittest.TestCase):
 
         # test negative cut
         cut = -0.5
-        e = self.erosion_value(cut, step)
         expected = np.array(
             [
-                [0, 0, 1, e, 0, 0],
-                [0, 0, 1, e, 0, 0],
-                [0, 0, 1, e, 0, 0],
+                [0, 0, 1, 0.5, 0, 0],
+                [0, 0, 1, 0.5, 0, 0],
+                [0, 0, 1, 0.5, 0, 0],
             ],
             dtype=float,
         )
@@ -194,12 +182,11 @@ class TestErosion(unittest.TestCase):
 
         # test positive cut
         cut = 1.0
-        e = self.erosion_value(cut, step)
         expected = np.array(
             [
-                [0, 0, e, 0, 0, 0],
-                [0, 0, e, 0, 0, 0],
-                [0, 0, e, 0, 0, 0],
+                [0, 0, 1, 0, 0, 0],
+                [0, 0, 1, 0, 0, 0],
+                [0, 0, 1, 0, 0, 0],
             ],
             dtype=float,
         )
@@ -210,12 +197,11 @@ class TestErosion(unittest.TestCase):
 
         # test negative cut
         cut = -1.0
-        e = self.erosion_value(cut, step)
         expected = np.array(
             [
-                [e, 0, 0, 0, 0, 0],
-                [e, 0, 0, 0, 0, 0],
-                [e, 0, 0, 0, 0, 0],
+                [1, 0, 0, 0, 0, 0],
+                [1, 0, 0, 0, 0, 0],
+                [1, 0, 0, 0, 0, 0],
             ],
             dtype=float,
         )
@@ -237,12 +223,11 @@ class TestErosion(unittest.TestCase):
         
         # test positive cut
         cut = 0.49
-        e = self.erosion_value(cut, step)
         expected = np.array(
             [
-                [0, 0, 0, e, 1, 1, 0, 0, 0, e, 1, 1, 0, e, 0],
-                [0, 0, 0, e, 1, 1, 0, 0, 0, e, 1, 1, 0, e, 0],
-                [0, 0, 0, e, 1, 1, 0, 0, 0, e, 1, 1, 0, e, 0],
+                [0, 0, 0, 0.02, 1, 1, 0, 0, 0, 0.02, 1, 1, 0, 0.02, 0],
+                [0, 0, 0, 0.02, 1, 1, 0, 0, 0, 0.02, 1, 1, 0, 0.02, 0],
+                [0, 0, 0, 0.02, 1, 1, 0, 0, 0, 0.02, 1, 1, 0, 0.02, 0],
             ],
             dtype=float,
         )
@@ -253,12 +238,11 @@ class TestErosion(unittest.TestCase):
 
         # test negative cut
         cut = -0.49
-        e = self.erosion_value(cut, step)
         expected = np.array(
             [
-                [0, 0, 0, 1, 1, e, 0, 0, 0, 1, 1, e, 0, e, 0],
-                [0, 0, 0, 1, 1, e, 0, 0, 0, 1, 1, e, 0, e, 0],
-                [0, 0, 0, 1, 1, e, 0, 0, 0, 1, 1, e, 0, e, 0],
+                [0, 0, 0, 1, 1, 0.02, 0, 0, 0, 1, 1, 0.02, 0, 0.02, 0],
+                [0, 0, 0, 1, 1, 0.02, 0, 0, 0, 1, 1, 0.02, 0, 0.02, 0],
+                [0, 0, 0, 1, 1, 0.02, 0, 0, 0, 1, 1, 0.02, 0, 0.02, 0],
             ],
             dtype=float,
         )
@@ -280,12 +264,11 @@ class TestErosion(unittest.TestCase):
         
         # test positive cut
         cut = 1.2
-        e = self.erosion_value(cut, step)
         expected = np.array(
             [
-                [0, 0, 0, 0, 0, 0, 0, 0, 0, e, 1, 1, 0],
-                [0, 0, 0, 0, 0, 0, 0, 0, 0, e, 1, 1, 0],
-                [0, 0, 0, 0, 0, 0, 0, 0, 0, e, 1, 1, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0.6, 1, 1, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0.6, 1, 1, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0.6, 1, 1, 0],
             ],
             dtype=float,
         )
@@ -296,12 +279,11 @@ class TestErosion(unittest.TestCase):
 
         # test negative cut
         cut = -1.2
-        e = self.erosion_value(cut, step)
         expected = np.array(
             [
-                [0, 0, 0, 0, 0, 0, 0, 1, 1, e, 0, 0, 0],
-                [0, 0, 0, 0, 0, 0, 0, 1, 1, e, 0, 0, 0],
-                [0, 0, 0, 0, 0, 0, 0, 1, 1, e, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 1, 1, 0.6, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 1, 1, 0.6, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 1, 1, 0.6, 0, 0, 0],
             ],
             dtype=float,
         )
