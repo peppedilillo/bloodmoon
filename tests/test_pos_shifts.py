@@ -1,5 +1,6 @@
 import unittest
 
+from random import choice
 import numpy as np
 
 from bloodmoon.assets import _path_test_mask
@@ -16,14 +17,11 @@ class TestShift2Pos(unittest.TestCase):
 
     def test_binning_boundaries(self):
         """Test for allowed and not allowed shifts wrt the binning."""
-        # Sky bins edges:
+        # Sky bins edges for upscaling x=2, y=2:
         #   - x-axis: (-209, 209)
         #   - x-axis: (-206.53333333, 206.53333333)
 
         # test for the allowed shifts at the edges of the binning
-        print(shift2pos(self.wfm, -0.001, -0.001))
-        print(pos2shift(self.wfm, *shift2pos(self.wfm, 0., 0.))[::-1])
-
         comb_yes = [
             (-208.99999, -206.53332333),
             (-208.99999, 206.53332333),
@@ -64,10 +62,24 @@ class TestPos2Shift(unittest.TestCase):
         same pixel indexes obtained with `shift2pos()`.
         """
         n, m = self.wfm.shape_sky
-        for _ in range(10000):
+        for _ in range(10_000):
             y, x = (np.random.randint(0, n), np.random.randint(0, m))
             self.assertEqual((y, x), shift2pos(self.wfm, *pos2shift(self.wfm, x, y)))
-        
+
+    def test_s2p_and_p2s_are_inverse(self):
+        """
+        Tests if computed pixel indexes through `shift2pos()` refer
+        to the same binning shifts obtained with `pos2shift()`.
+        """
+        binsx, binsy = self.wfm.bins_sky
+        for _ in range(10_000):
+            shiftx = choice(binsx)
+            shifty = choice(binsy)
+            y, x = shift2pos(self.wfm, shiftx, shifty)
+            self.assertEqual(
+                (shiftx, shifty),
+                pos2shift(self.wfm, x, y),
+            )
 
     def test_positive_and_negative_idxs(self):
         """Tests if positive and negative idxs refer to the same shifts."""

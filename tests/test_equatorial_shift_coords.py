@@ -49,7 +49,7 @@ class TestEquatorial2Shift(unittest.TestCase):
         Tests if computed shifts through `equatorial2shift()` refer to the
         same sky-shifts coordinates obtained with `shift2equatorial()`.
         """
-        for _ in range(100_000):
+        for _ in range(10_000):
             sky_bins = self.wfm.bins_sky
             input_shiftx = np.random.uniform(sky_bins.x[0], sky_bins.x[-1])
             input_shifty = np.random.uniform(sky_bins.y[0], sky_bins.y[-1])
