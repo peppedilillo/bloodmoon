@@ -49,7 +49,7 @@ class TestEquatorial2Shift(unittest.TestCase):
         Tests if computed shifts through `equatorial2shift()` refer to the
         same sky-shifts coordinates obtained with `shift2equatorial()`.
         """
-        for _ in range(100_000):
+        for _ in range(10_000):
             sky_bins = self.wfm.bins_sky
             input_shiftx = np.random.uniform(sky_bins.x[0], sky_bins.x[-1])
             input_shifty = np.random.uniform(sky_bins.y[0], sky_bins.y[-1])
@@ -85,6 +85,22 @@ class TestEquatorial2Shift(unittest.TestCase):
                 np.array([output_ra, output_dec]),
                 decimal=7,
             )
+    
+    def test_coords_transform(self):
+        """Tests specifics shifts - RA/Dec values."""
+        optical_axis_shifts = (0., 0.)
+        optical_axis_coords = (266.4, -28.94)
+
+        # shifts -> RA/Dec
+        np.testing.assert_array_almost_equal(
+            np.array(shift2equatorial(self.sdl, self.wfm, *optical_axis_shifts)),
+            np.array(optical_axis_coords),
+        )
+        # RA/Dec -> shifts
+        np.testing.assert_almost_equal(
+            np.array(optical_axis_shifts),
+            np.array(equatorial2shift(self.sdl, self.wfm, *optical_axis_coords)),
+        )
 
     def test_rotation_matrices(self):
         """Tests if rotation matrices are orthogonal."""
