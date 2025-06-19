@@ -10,24 +10,22 @@ This module implements the primary algorithms for:
 
 These components form the foundation of the WFM data analysis pipeline.
 """
-
 from bisect import bisect_left
 from bisect import bisect_right
 from dataclasses import dataclass
-from functools import cache
 from functools import cached_property
 from pathlib import Path
 
 from astropy.io.fits.fitsrec import FITS_rec
 import numpy as np
 import numpy.typing as npt
+from bloodmoon.coords import pos2shift
 from scipy.signal import convolve
 from scipy.signal import correlate
 from scipy.stats import binned_statistic_2d
 
-from .images import _erosion
+from .images import _erosion, _rbilinear
 from .images import _interp
-from .images import _rbilinear_relative
 from .images import _shift
 from .images import _unframe
 from .images import _upscale
@@ -421,30 +419,14 @@ def _detector_footprint(camera: CodedMaskCamera) -> tuple[int, int, int, int]:
     return i_min, i_max, j_min, j_max
 
 
-@cache
-def _packing_factor(camera: CodedMaskCamera) -> tuple[float, float]:
-    """
-    Returns the density of slits along the x and y axis.
-
-    Args:
-        camera: a CodedMaskCamera object.
-
-    Returns:
-        A tuple of the x and y packing factors.
-    """
-    rows_notnull = camera.mask[np.any(camera.mask != 0, axis=1), :]
-    cols_notnull = camera.mask[:, np.any(camera.mask != 0, axis=0)]
-    pack_x, pack_y = np.mean(np.mean(rows_notnull, axis=1)), np.mean(np.mean(cols_notnull, axis=0))
-    return float(pack_x), float(pack_y)
-
-
-def strip(
+def cutout(
     camera: CodedMaskCamera,
     pos: tuple[int, int],
+    fx: float = 1,
+    fy: float = 1,
 ) -> tuple[tuple, BinsRectangular]:
     """
-    Returns a thin slice of sky centered around `pos`.
-    The strip has height 1 in the y direction and length equal to slit length in x direction.
+    Returns a cutout of sky centered around `pos` with length multiple of the mask slit size.
 
     Args:
         camera: a CodedMaskCameraObject.
@@ -454,16 +436,16 @@ def strip(
         A tuple of the slice value (length n) and its bins (length n + 1).
     """
     bins = camera.bins_sky
-    i, j = pos
+    sx, sy = pos2shift(camera, *pos)
     min_i, max_i = _bisect_interval(
         bins.y,
-        max(bins.y[i] - camera.mdl["slit_deltay"] / 2, bins.y[0]),
-        min(bins.y[i] + camera.mdl["slit_deltay"] / 2, bins.y[-1]),
+        max(sy - camera.mdl["slit_deltay"] * (fy / 2), bins.y[0]),
+        min(sy + camera.mdl["slit_deltay"] * (fy / 2), bins.y[-1]),
     )
     min_j, max_j = _bisect_interval(
         bins.x,
-        max(bins.x[j] - camera.mdl["slit_deltax"] / 2, bins.x[0]),
-        min(bins.x[j] + camera.mdl["slit_deltax"] / 2, bins.x[-1]),
+        max(sx - camera.mdl["slit_deltax"] * (fx / 2), bins.x[0]),
+        min(sx + camera.mdl["slit_deltax"] * (fx / 2), bins.x[-1]),
     )
     return (min_i, max_i, min_j, max_j), BinsRectangular(
         x=bins.x[min_j : max_j + 1],
@@ -471,44 +453,11 @@ def strip(
     )
 
 
-def chop(
-    camera: CodedMaskCamera,
-    pos: tuple[int, int],
-) -> tuple[tuple, BinsRectangular]:
-    """
-    Returns a slice of sky centered around `pos` and sized slightly larger than slit size.
-
-    Args:
-        camera: a CodedMaskCameraObject.
-        pos: the (row, col) indeces of the slice center.
-
-    Returns:
-        A tuple of the slice value (length n) and its bins (length n + 1).
-    """
-    bins = camera.bins_sky
-    i, j = pos
-    packing_x, packing_y = _packing_factor(camera)
-    min_i, max_i = _bisect_interval(
-        bins.y,
-        max(bins.y[i] - camera.mdl["slit_deltay"] / (2 * packing_y), bins.y[0]),
-        min(bins.y[i] + camera.mdl["slit_deltay"] / (2 * packing_y), bins.y[-1]),
-    )
-    min_j, max_j = _bisect_interval(
-        bins.x,
-        max(bins.x[j] - camera.mdl["slit_deltax"] / (2 * packing_x), bins.x[0]),
-        min(bins.x[j] + camera.mdl["slit_deltax"] / (2 * packing_x), bins.x[-1]),
-    )
-    return (min_i, max_i, min_j, max_j), BinsRectangular(
-        x=bins.x[min_j : max_j + 1],
-        y=bins.y[min_i : max_i + 1],
-    )
-
-
-def _interpmax(
+def interpmax(
     camera: CodedMaskCamera,
     pos,
     sky,
-    interp_f: UpscaleFactor,
+    interp_f: UpscaleFactor = UpscaleFactor(9, 9),
 ) -> tuple[float, float]:
     """
     Interpolates and maximizes data around pos.
@@ -522,11 +471,7 @@ def _interpmax(
     Returns:
         Sky-shift position of the interpolated maximum.
     """
-    (min_i, max_i, min_j, max_j), bins = strip(camera, pos)
-    # we want to use the cubic interpolator so we take a larger window using chop
-    # if strip get us a slice too small. this may happen for masks with no upscaling.
-    if not (max_i - min_i > 1 and min_j - max_j > 1):
-        (min_i, max_i, min_j, max_j), bins = chop(camera, pos)
+    (min_i, max_i, min_j, max_j), bins = cutout(camera, pos, 4, 1)
     tile_interp, bins_fine = _interp(sky[min_i:max_i, min_j:max_j], bins, interp_f)
     max_tile_i, max_tile_j = argmax(tile_interp)
     return float(bins_fine.x[max_tile_j]), float(bins_fine.y[max_tile_i])
@@ -632,23 +577,28 @@ def apply_vignetting(
     """
     bins = camera.bins_detector
 
-    angle_x_rad = abs(np.arctan(shift_x / camera.mdl["mask_detector_distance"]))
+    angle_x_rad = np.arctan(shift_x / camera.mdl["mask_detector_distance"])
     red_factor = camera.mdl["mask_thickness"] * np.tan(angle_x_rad)
-    sg1 = _erosion(shadowgram, bins.x[1] - bins.x[0], red_factor)
+    # since the mask detector distance is assumed to be the distance between the
+    # detector top and the mask bottom, erosion shall cut on the right-side of the
+    # shadowgram when sources have negative `angle_x_rad`.
+    # given the implementation of `erosion` we have presently to multiply `red_factor`
+    # by -1 to achieve a cut on the right direction.
+    # TODO: change `erosion` and its tests so that multiplying by -1 isn't needed
+    sg1 = _erosion(shadowgram, bins.x[1] - bins.x[0], -red_factor)
 
-    angle_y_rad = abs(np.arctan(shift_y / camera.mdl["mask_detector_distance"]))
+    angle_y_rad = np.arctan(shift_y / camera.mdl["mask_detector_distance"])
     red_factor = camera.mdl["mask_thickness"] * np.tan(angle_y_rad)
-    sg2 = _erosion(shadowgram.T, bins.y[1] - bins.y[0], red_factor)
+    sg2 = _erosion(shadowgram.T, bins.y[1] - bins.y[0], -red_factor)
     return sg1 * sg2.T
 
 
 def model_shadowgram(
-    camera: CodedMaskCamera,
-    shift_x: float,
-    shift_y: float,
-    fluence: float,
-    vignetting: bool = True,
-    psfy: bool = True,
+        camera: CodedMaskCamera,
+        shift_x: float,
+        shift_y: float,
+        vignetting: bool = True,
+        psfy: bool = True,
 ) -> npt.NDArray:
     """
     Generates a shadowgram for a point source.
@@ -657,12 +607,10 @@ def model_shadowgram(
     - Mask pattern projection
     - Vignetting effects
     - PSF convolution over y axis
-    - Flux scaling
 
     Args:
         shift_x: Source position x-coordinate in sky-shift space (mm)
         shift_y: Source position y-coordinate in sky-shift space (mm)
-        fluence: Source intensity/fluence value
         camera: CodedMaskCamera instance containing all geometric parameters
         vignetting: simulates vignetting effects
         psfy: simulates detector reconstruction effects
@@ -671,30 +619,43 @@ def model_shadowgram(
         2D array representing the modeled detector image from the source
 
     Notes:
-        - Results are normalized to fluence, e.g. the sum of the result equals `fluence`.
+        * Results are normalized, i.e. sums up to one.
     """
+
+    def process_mask(shift_x, shift_y):
+        mask_maybe_vignetted = (
+            apply_vignetting(
+                camera,
+                camera.mask,
+                shift_x,
+                shift_y,
+            )
+            if vignetting
+            else camera.mask
+        )
+        mask_maybe_vignetted_maybe_psfy = (
+            convolve(
+                mask_maybe_vignetted,
+                _convolution_kernel_psfy(camera),
+                mode="same",
+            )
+            if psfy
+            else mask_maybe_vignetted
+        )
+        return mask_maybe_vignetted_maybe_psfy
+
     # relative component map
-    RCMAP = {
-        0: slice(1, -1),
-        +1: slice(2, None),
-        -1: slice(None, -2),
-    }
-
+    components = _rbilinear(shift_x, shift_y, camera.bins_sky.x, camera.bins_sky.y)
     n, m = camera.shape_sky
+    detector = np.zeros(camera.shape_detector)
     i_min, i_max, j_min, j_max = _detector_footprint(camera)
-    _mask = apply_vignetting(camera, camera.mask, shift_x, shift_y) if vignetting else camera.mask
-    _mask = convolve(_mask, _convolution_kernel_psfy(camera), mode="same") if psfy else _mask
-    components, (pivot_i, pivot_j) = _rbilinear_relative(shift_x, shift_y, camera.bins_sky.x, camera.bins_sky.y)
-    r, c = (n // 2 - pivot_i), (m // 2 - pivot_j)
-    mask_shifted_processed = _shift(_mask, (r, c))
-
-    framed_shadowgram = mask_shifted_processed[i_min - 1 : i_max + 1, j_min - 1 : j_max + 1]
-    model = (
-        sum(framed_shadowgram[RCMAP[pos_i], RCMAP[pos_j]] * weight for (pos_i, pos_j), weight in components.items())
-        * camera.bulk
-    )
-    model /= np.sum(model)
-    return model * fluence
+    for (c_i, c_j), weight in components.items():
+        r, c = (n // 2 - c_i), (m // 2 - c_j)
+        mask_p = process_mask(camera.bins_sky.x[c_j], camera.bins_sky.y[c_i])  # mask processed
+        sg = _shift(mask_p, (r, c))  # mask shifted processed
+        detector += sg[i_min: i_max, j_min: j_max] * weight
+    detector /= np.sum(detector)
+    return detector
 
 
 def model_sky(
@@ -729,4 +690,4 @@ def model_sky(
     Notes:
         - For optimization, consider using the dedicated, cached function of `optim.py`
     """
-    return decode(camera, model_shadowgram(camera, shift_x, shift_y, fluence, vignetting, psfy))
+    return decode(camera, model_shadowgram(camera, shift_x, shift_y, vignetting=vignetting, psfy=psfy)) * fluence
