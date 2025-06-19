@@ -10,6 +10,7 @@ This module implements the primary algorithms for:
 
 These components form the foundation of the WFM data analysis pipeline.
 """
+
 from bisect import bisect_left
 from bisect import bisect_right
 from dataclasses import dataclass
@@ -19,13 +20,15 @@ from pathlib import Path
 from astropy.io.fits.fitsrec import FITS_rec
 import numpy as np
 import numpy.typing as npt
-from bloodmoon.coords import pos2shift
 from scipy.signal import convolve
 from scipy.signal import correlate
 from scipy.stats import binned_statistic_2d
 
-from .images import _erosion, _rbilinear
+from bloodmoon.coords import pos2shift
+
+from .images import _erosion
 from .images import _interp
+from .images import _rbilinear
 from .images import _shift
 from .images import _unframe
 from .images import _upscale
@@ -594,11 +597,11 @@ def apply_vignetting(
 
 
 def model_shadowgram(
-        camera: CodedMaskCamera,
-        shift_x: float,
-        shift_y: float,
-        vignetting: bool = True,
-        psfy: bool = True,
+    camera: CodedMaskCamera,
+    shift_x: float,
+    shift_y: float,
+    vignetting: bool = True,
+    psfy: bool = True,
 ) -> npt.NDArray:
     """
     Generates a shadowgram for a point source.
@@ -653,7 +656,7 @@ def model_shadowgram(
         r, c = (n // 2 - c_i), (m // 2 - c_j)
         mask_p = process_mask(camera.bins_sky.x[c_j], camera.bins_sky.y[c_i])  # mask processed
         sg = _shift(mask_p, (r, c))  # mask shifted processed
-        detector += sg[i_min: i_max, j_min: j_max] * weight
+        detector += sg[i_min:i_max, j_min:j_max] * weight
     detector /= np.sum(detector)
     return detector
 

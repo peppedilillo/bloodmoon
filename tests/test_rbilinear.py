@@ -3,7 +3,8 @@ import unittest
 
 import numpy as np
 
-from bloodmoon.images import _rbilinear, _rbilinear_relative
+from bloodmoon.images import _rbilinear
+from bloodmoon.images import _rbilinear_relative
 
 
 class TestAntibilinear(unittest.TestCase):
@@ -288,7 +289,6 @@ class TestAntibilinear(unittest.TestCase):
         weights = _rbilinear(1.0, 1.0, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
 
-
     def test_midbin1(self):
         bins_x = np.linspace(0, 5.0, 6)
         bins_y = np.linspace(0, 7.0, 8)
@@ -339,7 +339,6 @@ class TestAntibilinear(unittest.TestCase):
         )
         weights = _rbilinear(3 - 0.01, 4 - 0.01, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
-
 
 
 if __name__ == "__main__":

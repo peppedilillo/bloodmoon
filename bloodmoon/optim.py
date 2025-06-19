@@ -10,6 +10,7 @@ This module provides algorithms for:
 
 The optimization handles both spatial and intensity parameters simultaneously.
 """
+
 from functools import lru_cache
 from typing import Callable, Iterable, Literal
 import warnings
@@ -19,21 +20,24 @@ import numpy.typing as npt
 from scipy.optimize import minimize
 from scipy.signal import convolve
 
-from bloodmoon.coords import shift2pos, pos2shift
-from .images import _rbilinear_relative, _rbilinear
+from bloodmoon.coords import pos2shift
+from bloodmoon.coords import shift2pos
+
+from .images import _rbilinear
+from .images import _rbilinear_relative
 from .images import _shift
 from .io import SimulationDataLoader
 from .mask import _convolution_kernel_psfy
 from .mask import _detector_footprint
-from .mask import interpmax
 from .mask import apply_vignetting
 from .mask import CodedMaskCamera
 from .mask import count
+from .mask import cutout
 from .mask import decode
+from .mask import interpmax
 from .mask import model_shadowgram
 from .mask import model_sky
 from .mask import snratio
-from .mask import cutout
 from .mask import variance
 
 
@@ -103,6 +107,7 @@ def ModelFluence(  # noqa
         _d = decode(camera, sg)
         cache[(shift_x, shift_y)] = _d
         return _d * fluence
+
     return f, cache_clear
 
 
@@ -195,9 +200,9 @@ def ModelShiftFluence(
             r, c = (n // 2 - pivot_i), (m // 2 - pivot_j)
 
             # we call with pivot because calling with shifts to ensure consistent cached/vignetting combos
-            mask_p = process_mask(camera.bins_sky.x[pivot_j], camera.bins_sky.y[pivot_i]) # mask processed
-            mask_sp = _shift(mask_p, (r, c)) # mask shifted processed
-            sg_f = mask_sp[i_min - 1 : i_max + 1, j_min - 1 : j_max + 1] # shadowgram framed
+            mask_p = process_mask(camera.bins_sky.x[pivot_j], camera.bins_sky.y[pivot_i])  # mask processed
+            mask_sp = _shift(mask_p, (r, c))  # mask shifted processed
+            sg_f = mask_sp[i_min - 1 : i_max + 1, j_min - 1 : j_max + 1]  # shadowgram framed
 
             # this makes me suffer, there should be a way to not compute decode four times..
             # TODO: is it possible to obtain the same behaviour without four decodings?
@@ -233,6 +238,7 @@ def ModelShiftFluenceUncached(  # noqa
         Two callables. The first is the routine for computing the model, the second
         is a routine for freeing the cache.
     """
+
     def process_mask(shift_x, shift_y):
         mask_maybe_vignetted = (
             apply_vignetting(
@@ -277,15 +283,15 @@ def ModelShiftFluenceUncached(  # noqa
         i_min, i_max, j_min, j_max = _detector_footprint(camera)
         for (c_i, c_j), weight in components.items():
             r, c = (n // 2 - c_i), (m // 2 - c_j)
-            mask_p = process_mask(camera.bins_sky.x[c_j], camera.bins_sky.y[c_i]) # mask processed
-            sg = _shift(mask_p, (r, c)) # mask shifted processed
-            detector += sg[i_min: i_max, j_min: j_max] * weight
+            mask_p = process_mask(camera.bins_sky.x[c_j], camera.bins_sky.y[c_i])  # mask processed
+            sg = _shift(mask_p, (r, c))  # mask shifted processed
+            detector += sg[i_min:i_max, j_min:j_max] * weight
         detector /= np.sum(detector)
         return decode(camera, detector) * fluence
 
     # there is no cache here, hence no need to clean anything.
     # we return a lambda anyway for compatibility with the other models
-    return f, lambda : None
+    return f, lambda: None
 
 
 def Loss(model_f: Callable) -> Callable:  # noqa
@@ -370,7 +376,8 @@ def optimize(
         - Bounds are set based on initial guess and physical constraints
     """
     from bloodmoon.images import argmax
-    sx_start, sy_start =  interpmax(camera, arg_sky, sky) # pos2shift(camera, *argmax(sky))
+
+    sx_start, sy_start = interpmax(camera, arg_sky, sky)  # pos2shift(camera, *argmax(sky))
     fluence_start = sky.max()
 
     # initialize the function to compute coarse, fluence-dependent shadowgram model.

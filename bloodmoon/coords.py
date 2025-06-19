@@ -8,12 +8,14 @@ This module provides functions to convert between different coordinate systems:
 
 The transformations account for the instrument geometry and pointing direction.
 """
+
 from bisect import bisect
+# python is a disgusting piece of shit. cf. PEP 749
+from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
-# python is a disgusting piece of shit. cf. PEP 749
-from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from .mask import CodedMaskCamera
 
@@ -64,7 +66,6 @@ def pos2shift(
     xmidpoints = (camera.bins_sky.x[1:] + camera.bins_sky.x[:-1]) / 2
     ymidpoints = (camera.bins_sky.y[1:] + camera.bins_sky.y[:-1]) / 2
     return float(xmidpoints[j]), float(ymidpoints[i])
-
 
 
 def shift2angle(camera: "CodedMaskCamera", shift: float) -> float:

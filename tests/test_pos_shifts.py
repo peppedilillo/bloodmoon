@@ -3,8 +3,9 @@ import unittest
 import numpy as np
 
 from bloodmoon.assets import _path_test_mask
+from bloodmoon.coords import pos2shift
+from bloodmoon.coords import shift2pos
 from bloodmoon.mask import codedmask
-from bloodmoon.coords import shift2pos, pos2shift
 
 
 class TestShift2Pos(unittest.TestCase):
@@ -30,6 +31,7 @@ class TestShift2Pos(unittest.TestCase):
 
 class TestPos2Shift(unittest.TestCase):
     """Test for the `pos2shift()` function in `coords.py`."""
+
     def assertAlmostEqualTuples(self, t1, t2):
         for e1, e2 in zip(t1, t2):
             self.assertAlmostEqual(e1, e2)

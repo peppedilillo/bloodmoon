@@ -494,7 +494,7 @@ def _erosion(
     #   - the bin with the decimal values is the one
     #     to the left or right wrt the cutted bins
     erosion_value = abs(cut / step - ncuts)
-    border = ((cutted - _shift(cutted, (0, int(np.sign(cut))))) > 0)
+    border = (cutted - _shift(cutted, (0, int(np.sign(cut))))) > 0
     return cutted - border * erosion_value
 
 

@@ -3,7 +3,8 @@ import unittest
 
 import numpy as np
 
-from bloodmoon.images import _rbilinear, _rbilinear_relative
+from bloodmoon.images import _rbilinear
+from bloodmoon.images import _rbilinear_relative
 
 
 class TestAntibilinear(unittest.TestCase):
@@ -58,10 +59,10 @@ class TestAntibilinear(unittest.TestCase):
         components, pivot = _rbilinear_relative(cx, cy, bins_x, bins_y)
         weights = _rbilinear(cx, cy, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
-        self.assertAlmostEqual(components[(0, 0)], .5625)
-        self.assertAlmostEqual(components[(-1, 0)], .1875)
-        self.assertAlmostEqual(components[(0, -1)], .1875)
-        self.assertAlmostEqual(components[(-1, -1)], .0625)
+        self.assertAlmostEqual(components[(0, 0)], 0.5625)
+        self.assertAlmostEqual(components[(-1, 0)], 0.1875)
+        self.assertAlmostEqual(components[(0, -1)], 0.1875)
+        self.assertAlmostEqual(components[(-1, -1)], 0.0625)
         self.assertEqual(pivot, (3, 2))
 
     def test_offaxis_point2(self):
@@ -82,10 +83,10 @@ class TestAntibilinear(unittest.TestCase):
         components, pivot = _rbilinear_relative(cx, cy, bins_x, bins_y)
         weights = _rbilinear(cx, cy, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
-        self.assertAlmostEqual(components[(0, 0)], .5625)
-        self.assertAlmostEqual(components[(0, +1)], .1875)
-        self.assertAlmostEqual(components[(-1, 0)], .1875)
-        self.assertAlmostEqual(components[(-1, +1)], .0625)
+        self.assertAlmostEqual(components[(0, 0)], 0.5625)
+        self.assertAlmostEqual(components[(0, +1)], 0.1875)
+        self.assertAlmostEqual(components[(-1, 0)], 0.1875)
+        self.assertAlmostEqual(components[(-1, +1)], 0.0625)
         self.assertEqual(pivot, (3, 2))
 
     def test_offaxis_point3(self):
@@ -106,12 +107,11 @@ class TestAntibilinear(unittest.TestCase):
         components, pivot = _rbilinear_relative(cx, cy, bins_x, bins_y)
         weights = _rbilinear(cx, cy, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
-        self.assertAlmostEqual(components[(0, 0)], .5625)
-        self.assertAlmostEqual(components[(0, +1)], .1875)
-        self.assertAlmostEqual(components[(+1, 0)], .1875)
-        self.assertAlmostEqual(components[(+1, +1)], .0625)
+        self.assertAlmostEqual(components[(0, 0)], 0.5625)
+        self.assertAlmostEqual(components[(0, +1)], 0.1875)
+        self.assertAlmostEqual(components[(+1, 0)], 0.1875)
+        self.assertAlmostEqual(components[(+1, +1)], 0.0625)
         self.assertEqual(pivot, (3, 2))
-
 
     def test_offaxis_point4(self):
         bins_x = np.linspace(0, 5, 6)
@@ -131,12 +131,11 @@ class TestAntibilinear(unittest.TestCase):
         components, pivot = _rbilinear_relative(cx, cy, bins_x, bins_y)
         weights = _rbilinear(cx, cy, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
-        self.assertAlmostEqual(components[(0, 0)], .5625)
-        self.assertAlmostEqual(components[(0, -1)], .1875)
-        self.assertAlmostEqual(components[(+1, 0)], .1875)
-        self.assertAlmostEqual(components[(+1, -1)], .0625)
+        self.assertAlmostEqual(components[(0, 0)], 0.5625)
+        self.assertAlmostEqual(components[(0, -1)], 0.1875)
+        self.assertAlmostEqual(components[(+1, 0)], 0.1875)
+        self.assertAlmostEqual(components[(+1, -1)], 0.0625)
         self.assertEqual(pivot, (3, 2))
-
 
     def test_offaxis_point5(self):
         bins_x = np.linspace(0, 5, 6)
@@ -152,14 +151,13 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        cx, cy = 2.5, 3.
+        cx, cy = 2.5, 3.0
         components, pivot = _rbilinear_relative(cx, cy, bins_x, bins_y)
         weights = _rbilinear(cx, cy, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
         self.assertAlmostEqual(components[(0, 0)], 0.5)
         self.assertAlmostEqual(components[(-1, 0)], 0.5)
         self.assertEqual(pivot, (3, 2))
-
 
     def test_offaxis_point6(self):
         bins_x = np.linspace(0, 5, 6)
@@ -175,7 +173,7 @@ class TestAntibilinear(unittest.TestCase):
                 [0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
-        cx, cy = 2.5, 4.
+        cx, cy = 2.5, 4.0
         components, pivot = _rbilinear_relative(cx, cy, bins_x, bins_y)
         weights = _rbilinear(cx, cy, bins_x, bins_y)
         self.assertWeightsEqual(weights, expected)
@@ -230,6 +228,7 @@ class TestAntibilinear(unittest.TestCase):
         self.assertAlmostEqual(components[(0, -1)], 0.25)
         self.assertAlmostEqual(components[(-1, 0)], 0.25)
         self.assertAlmostEqual(components[(-1, -1)], 0.25)
+
 
 if __name__ == "__main__":
     unittest.main()
