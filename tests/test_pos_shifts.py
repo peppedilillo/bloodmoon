@@ -34,16 +34,23 @@ class TestPos2Shift(unittest.TestCase):
     def setUp(self):
         self.wfm = codedmask(_path_test_mask, upscale_x=3, upscale_y=3)
 
-    def test_p2s_s2p_idempotent(self):
+    def test_s2p_p2s_idempotent(self):
         """
-        Tests if computed shifts through `pos2shift()` refer to the
-        same pixel indexes obtained with `shift2pos()`.
+        Tests `g(f(x)) = x`.
         """
         n, m = self.wfm.shape_sky
         for _ in range(1000):
             i, j = (np.random.randint(0, n), np.random.randint(0, m))
             self.assertEqual((i, j), shift2pos(self.wfm, *pos2shift(self.wfm, i, j)))
 
+    def test_p2s_s2p_idempotent(self):
+        """
+        Tests `f(g(x)) = x`.
+        """
+        n, m = self.wfm.shape_sky
+        for _ in range(1000):
+            i, j = (np.random.randint(0, n), np.random.randint(0, m))
+            self.assertEqual((i, j), shift2pos(self.wfm, *pos2shift(self.wfm, i, j)))
 
 if __name__ == "__main__":
     unittest.main()
