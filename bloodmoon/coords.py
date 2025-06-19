@@ -8,21 +8,23 @@ This module provides functions to convert between different coordinate systems:
 
 The transformations account for the instrument geometry and pointing direction.
 """
-
 from bisect import bisect
 
 import numpy as np
 import numpy.typing as npt
+# python is a disgusting piece of shit. cf. PEP 749
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .mask import CodedMaskCamera
 
 from .io import SimulationDataLoader
-from .mask import CodedMaskCamera
 from .types import BinsEquatorial
 from .types import BinsRectangular
 from .types import CoordEquatorial
 
 
 def shift2pos(
-    camera: CodedMaskCamera,
+    camera: "CodedMaskCamera",
     shift_x: float,
     shift_y: float,
 ) -> tuple[int, int]:
@@ -36,18 +38,7 @@ def shift2pos(
 
     Returns:
         Tuple of (row, column) indices in the discrete sky image grid
-
-    Raises:
-        ValueError: If shifts are outside valid range
     """
-
-    def check_bounds(bins, shift):
-        """Checks shifts validity wrt binning."""
-        return (shift >= bins[0]) and (shift <= bins[-1])
-
-    if not (check_bounds(camera.bins_sky.y, shift_y) and check_bounds(camera.bins_sky.x, shift_x)):
-        raise ValueError("Shifts outside binning boundaries.")
-
     return (
         bisect(camera.bins_sky.y, shift_y) - 1,
         bisect(camera.bins_sky.x, shift_x) - 1,
@@ -55,38 +46,28 @@ def shift2pos(
 
 
 def pos2shift(
-    camera: CodedMaskCamera,
-    x: int,
-    y: int,
+    camera: "CodedMaskCamera",
+    i: int,
+    j: int,
 ) -> tuple[float, float]:
     """
-    Convert sky pixel position (x, y) to sky-coordinate shifts.
+    Convert a sky-shift index to a continuous sky-shift coordinate.
 
     Args:
-        camera: A CodedMaskCamera object containing sky shape and binning information.
-        x: Pixel index along the x-axis. integer.
-        y: Pixel index along the y-axis. integer.
+        camera: CodedMaskCamera instance containing binning information
+        i: row index
+        j: column index
 
     Returns:
-        A tuple containing:
-            shift_x: X coordinate in sky-shift space (mm)
-            shift_y: Y coordinate in sky-shift space (mm)
-
-    Raises:
-        IndexError: if indexes are out of bound for given sky.
-
-    Notes:
-        - resulting shifts refer to the center of the pixel.
-        - negative indexes are allowed.
+        Tuple of (shift_x, shift_j) float coordinates
     """
-    n, m = camera.shape_sky
-    if not (-(n + 1) <= y <= n) or not (-(m + 1) <= x <= m):
-        raise IndexError(f"Indexes ({y}, {x}) are out of bound for sky shape {camera.shape_sky}.")
-
-    return camera.bins_sky.x[x], camera.bins_sky.y[y]
+    xmidpoints = (camera.bins_sky.x[1:] + camera.bins_sky.x[:-1]) / 2
+    ymidpoints = (camera.bins_sky.y[1:] + camera.bins_sky.y[:-1]) / 2
+    return float(xmidpoints[j]), float(ymidpoints[i])
 
 
-def shift2angle(camera: CodedMaskCamera, shift: float) -> float:
+
+def shift2angle(camera: "CodedMaskCamera", shift: float) -> float:
     """
     Convert sky-coordinate shift in respective angular coordinate in the
     coded mask camera reference frame.
@@ -104,12 +85,11 @@ def shift2angle(camera: CodedMaskCamera, shift: float) -> float:
 
     Notes:
         - `shift` must have same physical dimension of mask-detector distance, i.e. [mm].
-        - the distance to compute `angle` is assumed to be mask-detector plus half the mask thickness.
     """
     return np.rad2deg(np.arctan(shift / camera.specs["mask_detector_distance"]))
 
 
-def angle2shift(camera: CodedMaskCamera, angle: float) -> float:
+def angle2shift(camera: "CodedMaskCamera", angle: float) -> float:
     """
     Convert angular sky-coordinate in the coded mask camera reference
     frame in respective sky-coordinate shift.
@@ -124,16 +104,13 @@ def angle2shift(camera: CodedMaskCamera, angle: float) -> float:
     Usage:
         If the angle is the declination of the sky-versor projection on the
         the xz plane, returns the shift in the x direction.
-
-    Notes:
-        - the distance to compute `angle` is assumed to be mask-detector plus half the mask thickness.
     """
     return camera.specs["mask_detector_distance"] * np.tan(np.deg2rad(angle))
 
 
 def pos2equatorial(
     sdl: SimulationDataLoader,
-    camera: CodedMaskCamera,
+    camera: "CodedMaskCamera",
     y: int,
     x: int,
 ) -> CoordEquatorial:
@@ -162,7 +139,7 @@ def pos2equatorial(
 
 def shift2equatorial(
     sdl: SimulationDataLoader,
-    camera: CodedMaskCamera,
+    camera: "CodedMaskCamera",
     shift_x: float,
     shift_y: float,
 ) -> CoordEquatorial:
@@ -237,7 +214,7 @@ def _shift2equatorial(
 
 def equatorial2shift(
     sdl: SimulationDataLoader,
-    camera: CodedMaskCamera,
+    camera: "CodedMaskCamera",
     ra: float,
     dec: float,
 ) -> tuple[float, float]:
@@ -307,7 +284,7 @@ def _equatorial2shift(
     # the sky-shifts are computed from the versor `v` using the mask-detector distance
     shift_x = vx * distance_detector_mask / vz
     shift_y = vy * distance_detector_mask / vz
-    return map(float, (shift_x, shift_y))
+    return float(shift_x), float(shift_y)
 
 
 def _rotation_matrices(
@@ -375,7 +352,7 @@ def _rotation_matrices(
 
 def shiftgrid2equatorial(
     sdl: SimulationDataLoader,
-    camera: CodedMaskCamera,
+    camera: "CodedMaskCamera",
     shift_xs: npt.NDArray,
     shift_ys: npt.NDArray,
 ) -> BinsEquatorial:
@@ -482,32 +459,3 @@ def _shiftgrid2equatorial(
     decs = np.rad2deg(decs.reshape(midpoints_sky_xs.shape))
     ras = np.rad2deg(ras.reshape(midpoints_sky_ys.shape))
     return BinsEquatorial(ra=ras, dec=decs)
-
-
-def _to_angles(
-    midpoints_xs: npt.NDArray,
-    midpoints_ys: npt.NDArray,
-    distance_detector_mask: float,
-) -> BinsRectangular:
-    """
-    Expresses the sky-shift coordinates in terms of angle between source and the detector center.
-
-    Args:
-        midpoints_xs: X coordinates of the grid points on the sky-shift plane in spatial units
-            (e.g., mm or cm). Shape and dimension should match midpoints_ys.
-        midpoints_ys: Y coordinates of the grid points on the sky-shift plane in spatial units
-            (e.g., mm or cm). Shape and dimension should match midpoints_xs.
-        distance_detector_mask: Distance between the detector and mask planes in the same
-            spatial units as midpoints_xs and midpoints_ys.
-
-
-    Returns:
-        Bins2D record containing:
-            - `x` field: Angular offsets in the X direction in degrees.
-              Negative angles indicate positions left of center. Same shape as input arrays.
-            - `y` field: Angular offsets in the Y direction in degrees.
-              Negative angles indicate positions below center. Same shape as input arrays.
-    """
-    angles_xs = np.rad2deg(np.arctan(midpoints_xs / distance_detector_mask))
-    angles_ys = np.rad2deg(np.arctan(midpoints_ys / distance_detector_mask))
-    return BinsRectangular(x=angles_xs, y=angles_ys)
