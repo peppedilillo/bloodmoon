@@ -10,7 +10,7 @@ from bloodmoon.mask import codedmask
 from bloodmoon.mask import model_sky
 
 
-class Optimizer(unittest.TestCase):
+class TestOptimizer(unittest.TestCase):
     def setUp(self):
         self.wfm = codedmask(_path_test_mask)
 

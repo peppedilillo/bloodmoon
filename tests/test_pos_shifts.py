@@ -31,11 +31,6 @@ class TestShift2Pos(unittest.TestCase):
 
 class TestPos2Shift(unittest.TestCase):
     """Test for the `pos2shift()` function in `coords.py`."""
-
-    def assertAlmostEqualTuples(self, t1, t2):
-        for e1, e2 in zip(t1, t2):
-            self.assertAlmostEqual(e1, e2)
-
     def setUp(self):
         self.wfm = codedmask(_path_test_mask, upscale_x=3, upscale_y=3)
 
