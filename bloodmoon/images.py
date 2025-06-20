@@ -127,7 +127,10 @@ def compose(
         raise ValueError("Input matrices must have same shape")
 
     maxd, mind = max(a.shape), min(a.shape)
-    # if matrices have odd rows and even columns composition is ambiguous
+    # if matrices have odd rows and even columns, or viceversa, composition is ambiguous because
+    # we can't put one piece over the other at the dead center. we have to chose if putting one
+    # up or down a row. we solve this by silently cutting a column, or a row. We could pad
+    # but I feel it would end even worse.
     if maxd % 2 != mind % 2:
         if strict:
             raise ValueError("Input matrices must have rows and columns with same parity if `strict` is True")
@@ -148,7 +151,8 @@ def compose(
         b_embedding = np.pad(np.rot90(b, k=-1), pad_width=((delta, delta), (0, 0)))
     composed = a_embedding + b_embedding
 
-    def _rotb2b(i, j):
+    def _rotback2b(i, j):
+        """Given c_i, c_j indices !of the compose's output 'c'! returns b_i, b_j."""
         return mind - 1 - j, i
 
     def f(i: int, j: int) -> tuple[Optional[tuple[int, int]], Optional[tuple[int, int]]]:
@@ -179,13 +183,13 @@ def compose(
         elif j < mind + delta:
             if i < delta:
                 # N quadrant
-                return None, _rotb2b(i, j - delta)
+                return None, _rotback2b(i, j - delta)
             elif i < maxd - delta:
                 # C quadrant
-                return (i - delta, j), _rotb2b(i, j - delta)
+                return (i - delta, j), _rotback2b(i, j - delta)
             else:
                 # S quadrant
-                return None, _rotb2b(i, j - delta)
+                return None, _rotback2b(i, j - delta)
         else:
             # E quadrant
             if not (delta <= i < delta + mind):
