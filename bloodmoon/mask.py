@@ -657,6 +657,7 @@ def model_shadowgram(
         mask_p = process_mask(camera.bins_sky.x[c_j], camera.bins_sky.y[c_i])  # mask processed
         sg = _shift(mask_p, (r, c))  # mask shifted processed
         detector += sg[i_min:i_max, j_min:j_max] * weight
+    detector *= camera.bulk
     detector /= np.sum(detector)
     return detector
 
