@@ -410,7 +410,7 @@ def _ModelShiftFluence(
         mask_maybe_vignetted_maybe_psfy = (
             convolve(
                 mask_maybe_vignetted,
-                _convolution_kernel_psfy_cached(camera),
+                _wfm_psfy_kernel_cached(camera),
                 mode="same",
             )
             if psfy
