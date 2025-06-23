@@ -1,8 +1,13 @@
 from pathlib import Path
-from bloodmoon import codedmask, simulation, simulation_files, count, decode
-from bloodmoon.images import compose
 
 import matplotlib.pyplot as plt
+
+from bloodmoon import codedmask
+from bloodmoon import count
+from bloodmoon import decode
+from bloodmoon import simulation
+from bloodmoon import simulation_files
+from bloodmoon.images import compose
 
 # select data
 path_mask = "wfm_mask.fits"
@@ -28,4 +33,3 @@ composed, _ = compose(sky1a, sky1b)
 fig, ax = plt.subplots(1, 1, figsize=(8, 8))
 ax.imshow(composed, vmin=0, vmax=-composed.min())
 plt.show()
-

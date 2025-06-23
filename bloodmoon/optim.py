@@ -12,18 +12,20 @@ from functools import lru_cache
 from typing import Callable, Iterable, Literal
 import warnings
 
-import numpy as np
 from numpy import typing as npt
+import numpy as np
 from scipy.optimize import minimize
 from scipy.signal import convolve
 
 from bloodmoon.coords import shift2pos
 
-from .images import _rbilinear, _erosion
+from .images import _erosion
+from .images import _rbilinear
 from .images import _rbilinear_relative
 from .images import _shift
 from .io import SimulationDataLoader
-from .mask import _detector_footprint, _bisect_interval
+from .mask import _bisect_interval
+from .mask import _detector_footprint
 from .mask import CodedMaskCamera
 from .mask import count
 from .mask import cutout
@@ -321,6 +323,7 @@ def ModelShiftFluenceUncached(  # noqa
         Two callables. The first is the routine for computing the model, the second
         is a routine for freeing the cache.
     """
+
     def f(shift_x: float, shift_y: float, fluence: float) -> npt.NDArray:
         """
         A simple, slow version of the model for both direction and fluence optimization.

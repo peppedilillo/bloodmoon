@@ -31,6 +31,7 @@ class TestShift2Pos(unittest.TestCase):
 
 class TestPos2Shift(unittest.TestCase):
     """Test for the `pos2shift()` function in `coords.py`."""
+
     def setUp(self):
         self.wfm = codedmask(_path_test_mask, upscale_x=3, upscale_y=3)
 
@@ -51,6 +52,7 @@ class TestPos2Shift(unittest.TestCase):
         for _ in range(1000):
             i, j = (np.random.randint(0, n), np.random.randint(0, m))
             self.assertEqual((i, j), shift2pos(self.wfm, *pos2shift(self.wfm, i, j)))
+
 
 if __name__ == "__main__":
     unittest.main()

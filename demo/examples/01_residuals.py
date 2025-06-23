@@ -4,38 +4,51 @@ CATALOG_PATH = "/path/to/catalog.csv"  # expected to contain RA and DEC for the 
 SIMDIR_PATH = "/path/to/simulation_directory/"  # expected to contain a `detected` simulation
 IROS_MAX_ITERATIONS = 5
 
+import matplotlib.pyplot as plt
 # script starts
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
-from bloodmoon import codedmask, simulation, simulation_files, iros
-from bloodmoon. io import SimulationDataLoader
-from bloodmoon.coords import equatorial2shift, shift2angle
+from bloodmoon import codedmask
+from bloodmoon import iros
+from bloodmoon import simulation
+from bloodmoon import simulation_files
+from bloodmoon.coords import equatorial2shift
+from bloodmoon.coords import shift2angle
+from bloodmoon.io import SimulationDataLoader
 from bloodmoon.utils import clock
 
 
 def table(shifts: list[tuple]) -> pd.DataFrame:
     sxs, sys = zip(*shifts)
-    return pd.DataFrame({
-        "SHIFTX": sxs,
-        "SHIFTY": sys,
-        "THETAX": [*map(lambda x: shift2angle(wfm, x), sxs)],
-        "THETAY": [*map(lambda y: shift2angle(wfm, y), sys)],
-    })
-
-def enrich(sdl: SimulationDataLoader, catalog: pd.DataFrame) -> pd.DataFrame:
-    shifts = [equatorial2shift(sdl, wfm, ra, dec) for i, (ra, dec) in catalog[["RA", "DEC"]].iterrows()]
-    sxs, sys = zip(*shifts)
-    return pd.concat((
-        catalog,
-        pd.DataFrame({
+    return pd.DataFrame(
+        {
             "SHIFTX": sxs,
             "SHIFTY": sys,
             "THETAX": [*map(lambda x: shift2angle(wfm, x), sxs)],
             "THETAY": [*map(lambda y: shift2angle(wfm, y), sys)],
-        })
-    ), axis=1)
+        }
+    )
+
+
+def enrich(sdl: SimulationDataLoader, catalog: pd.DataFrame) -> pd.DataFrame:
+    shifts = [equatorial2shift(sdl, wfm, ra, dec) for i, (ra, dec) in catalog[["RA", "DEC"]].iterrows()]
+    sxs, sys = zip(*shifts)
+    return pd.concat(
+        (
+            catalog,
+            pd.DataFrame(
+                {
+                    "SHIFTX": sxs,
+                    "SHIFTY": sys,
+                    "THETAX": [*map(lambda x: shift2angle(wfm, x), sxs)],
+                    "THETAY": [*map(lambda y: shift2angle(wfm, y), sys)],
+                }
+            ),
+        ),
+        axis=1,
+    )
+
 
 def run_iros(iterations: int):
     def callback(i: int, x):
@@ -55,7 +68,7 @@ def association_table(measured: pd.DataFrame, catalog: pd.DataFrame) -> dict:
     for i, row in measured.iterrows():
         deltax = catalog["SHIFTX"] - row["SHIFTX"]
         deltay = catalog["SHIFTY"] - row["SHIFTY"]
-        out[i] = int(np.argmin(deltax ** 2 + deltay ** 2))
+        out[i] = int(np.argmin(deltax**2 + deltay**2))
     return out
 
 
@@ -67,8 +80,10 @@ sdl1a = simulation(filepaths["cam1a"]["detected"])
 sdl1b = simulation(filepaths["cam1b"]["detected"])
 
 # adds shift columns to the catalog
-catalog1a_df = enrich(sdl1a, catalog_df); catalog1a_df.to_csv("catalog1a.txt", index=False)
-catalog1b_df = enrich(sdl1b, catalog_df); catalog1b_df.to_csv("catalog1b.txt", index=False)
+catalog1a_df = enrich(sdl1a, catalog_df)
+catalog1a_df.to_csv("catalog1a.txt", index=False)
+catalog1b_df = enrich(sdl1b, catalog_df)
+catalog1b_df.to_csv("catalog1b.txt", index=False)
 
 # run iros
 with clock("iros"):
@@ -86,31 +101,33 @@ xs = np.array([catalog1a_df["THETAX"][k] for k in cat2meas1a.keys()])
 ys = np.array([measured1a_df["THETAX"][v] for v in cat2meas1a.values()])
 ys = (ys - xs) * 60  # arcmin
 
-plt.figure(figsize=(12,8))
+plt.figure(figsize=(12, 8))
 plt.scatter(xs, ys)
 plt.ylabel("measured - true [arcmin]")
 plt.title("CAM1A X-axis")
-plt.savefig("cam1a_xaxis_theta.png"); plt.close()
+plt.savefig("cam1a_xaxis_theta.png")
+plt.close()
 
 # plots the residual as off-axis angle for cam1a relative to axis y
 xs = np.array([catalog1a_df["THETAX"][k] for k in cat2meas1a.keys()])
 ys = np.array([measured1a_df["THETAY"][v] for v in cat2meas1a.values()])
 ys = ys * 60  # arcmin
 
-plt.figure(figsize=(12,8))
+plt.figure(figsize=(12, 8))
 plt.scatter(xs, ys)
 plt.ylabel("measured - true [arcmin]")
 plt.title("CAM1A Y-axis")
-plt.savefig("cam1a_yaxis_theta.png"); plt.close()
+plt.savefig("cam1a_yaxis_theta.png")
+plt.close()
 
 # plots the residual shifts over the x axis.
 xs = np.array([catalog1a_df["SHIFTX"][k] for k in cat2meas1a.keys()])
 ys = np.array([measured1a_df["SHIFTX"][v] for v in cat2meas1a.values()])
-ys = (ys - xs)
+ys = ys - xs
 
-plt.figure(figsize=(12,8))
+plt.figure(figsize=(12, 8))
 plt.scatter(xs, ys)
 plt.ylabel("measured - true [mm]")
 plt.title("CAM1A X-axis")
-plt.savefig("cam1a_xaxis_shift.png"); plt.close()
-
+plt.savefig("cam1a_xaxis_shift.png")
+plt.close()
