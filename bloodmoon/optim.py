@@ -35,6 +35,7 @@ from .mask import snratio
 from .mask import variance
 
 
+
 def _modsech(
     x: npt.NDArray,
     norm: float,
@@ -58,7 +59,7 @@ def _modsech(
     return norm / np.cosh(np.abs((x - center) / alpha) ** beta)
 
 
-def psfy_wfm(x: npt.NDArray) -> npt.NDArray:
+def _wfm_psfy(x: npt.NDArray) -> npt.NDArray:
     """
     PSF function in y direction as fitted from WFM simulations.
 
@@ -76,7 +77,7 @@ def psfy_wfm(x: npt.NDArray) -> npt.NDArray:
     return _modsech(x, norm=1, **PSFY_WFM_PARAMS)
 
 
-def _convolution_kernel_psfy(camera: CodedMaskCamera) -> npt.NDArray:
+def _wfm_psfy_kernel(camera: CodedMaskCamera) -> npt.NDArray:
     """
     Returns PSF convolution kernel.
     At present, it ignores the `x` direction, since PSF characteristic lenght is much shorter
@@ -92,9 +93,15 @@ def _convolution_kernel_psfy(camera: CodedMaskCamera) -> npt.NDArray:
     min_bin, max_bin = _bisect_interval(bins.y, -camera.mdl["slit_deltay"], camera.mdl["slit_deltay"])
     bin_edges = bins.y[min_bin : max_bin + 1]
     midpoints = (bin_edges[1:] + bin_edges[:-1]) / 2
-    kernel = psfy_wfm(midpoints).reshape(len(midpoints), -1)
+    kernel = _wfm_psfy(midpoints).reshape(len(midpoints), -1)
     kernel = kernel / np.sum(kernel)
     return kernel
+
+
+@lru_cache(maxsize=1)
+def _wfm_psfy_kernel_cached(camera: CodedMaskCamera):
+    """Caching helper."""
+    return _wfm_psfy_kernel(camera)
 
 
 def apply_vignetting(
@@ -143,6 +150,12 @@ def apply_vignetting(
     return sg1 * sg2.T
 
 
+@lru_cache(maxsize=1)
+def _detector_footprint_cached(camera: CodedMaskCamera):
+    """Caching helper"""
+    return _detector_footprint(camera)
+
+
 def model_shadowgram(
     camera: CodedMaskCamera,
     shift_x: float,
@@ -186,7 +199,7 @@ def model_shadowgram(
         mask_maybe_vignetted_maybe_psfy = (
             convolve(
                 mask_maybe_vignetted,
-                _convolution_kernel_psfy(camera),
+                _wfm_psfy_kernel_cached(camera),
                 mode="same",
             )
             if psfy
@@ -198,7 +211,7 @@ def model_shadowgram(
     components = _rbilinear(shift_x, shift_y, camera.bins_sky.x, camera.bins_sky.y)
     n, m = camera.shape_sky
     detector = np.zeros(camera.shape_detector)
-    i_min, i_max, j_min, j_max = _detector_footprint(camera)
+    i_min, i_max, j_min, j_max = _detector_footprint_cached(camera)
     for (c_i, c_j), weight in components.items():
         r, c = (n // 2 - c_i), (m // 2 - c_j)
         mask_p = process_mask(camera.bins_sky.x[c_j], camera.bins_sky.y[c_i])  # mask processed
@@ -244,14 +257,14 @@ def model_sky(
     return decode(camera, model_shadowgram(camera, shift_x, shift_y, vignetting=vignetting, psfy=psfy)) * fluence
 
 
-def ModelFluence(  # noqa
+def _ModelFluence(  # noqa
     camera: CodedMaskCamera,
     vignetting: bool = True,
     psfy: bool = True,
 ) -> tuple[Callable, Callable]:
     """
-    A fast caching version of the model, leveraging correlation linearity.
-    Intended for fluence optimization (not for optimizing source direction).
+    A fast caching version of the model for optimization, leveraging correlation linearity.
+    Intended for fluence optimization, not for optimizing source direction.
 
     Args:
         camera: CodedMaskCamera instance containing all geometric parameters
@@ -304,7 +317,7 @@ def ModelFluence(  # noqa
 
 # this is essentially a wrapper to `mask.model_sky`,i am creating it because it's interface
 # follows the rules required by `optimize`.
-def ModelShiftFluenceUncached(  # noqa
+def _ModelShiftFluenceUncached(  # noqa
     camera: CodedMaskCamera,
     vignetting: bool = True,
     psfy: bool = True,
@@ -322,6 +335,12 @@ def ModelShiftFluenceUncached(  # noqa
     Returns:
         Two callables. The first is the routine for computing the model, the second
         is a routine for freeing the cache.
+
+    Notes:
+        * Although we label this as `Uncached` because it is not using the leveraging
+          correlation linearity as `_ModelShiftFluence` and `_ModelShift` do, this model
+          is still using some caching to speed up dumb computes such as detector footprint
+          and psfy kernel evaluation.
     """
 
     def f(shift_x: float, shift_y: float, fluence: float) -> npt.NDArray:
@@ -343,19 +362,7 @@ def ModelShiftFluenceUncached(  # noqa
     return f, lambda: None
 
 
-@lru_cache(maxsize=1)
-def _convolution_kernel_psfy_cached(camera: CodedMaskCamera):
-    """Cached helper."""
-    return _convolution_kernel_psfy(camera)
-
-
-@lru_cache(maxsize=1)
-def _detector_footprint_cached(camera: CodedMaskCamera):
-    """Cached helper"""
-    return _detector_footprint(camera)
-
-
-def ModelShiftFluence(
+def _ModelShiftFluence(
     camera: CodedMaskCamera,
     vignetting: bool = True,
     psfy: bool = True,
@@ -463,7 +470,7 @@ def ModelShiftFluence(
     return f, cache_clear
 
 
-def Loss(model_f: Callable) -> Callable:  # noqa
+def _Loss(model_f: Callable) -> Callable:  # noqa
     """
     Returns a loss function for source parameter optimization, given a routine for computing models.
 
@@ -544,8 +551,8 @@ def optimize(
     # to reduce the number of cross-correlation the function is cached. it is our
     # responsibility to clear cache, freeing memory, after we will be done with the
     # the coarse fluence step.
-    model_fluence, model_fluence_clear = ModelFluence(camera, vignetting, psfy)
-    loss = Loss(model_fluence)
+    model_fluence, model_fluence_clear = _ModelFluence(camera, vignetting, psfy)
+    loss = _Loss(model_fluence)
     results = minimize(
         lambda args: loss((sx_start, sy_start, args[0]), sky, camera),
         x0=np.array((fluence_start,)),
@@ -568,13 +575,13 @@ def optimize(
     # the number of cross-correlation computations, and it is our responsibility to free
     # memory after we will be done.
     if model == "fast":
-        model_shift_flux, model_shift_flux_clear = ModelShiftFluence(camera, vignetting, psfy)
+        model_shift_flux, model_shift_flux_clear = _ModelShiftFluence(camera, vignetting, psfy)
     elif model == "accurate":
-        model_shift_flux, model_shift_flux_clear = ModelShiftFluenceUncached(camera, vignetting, psfy)
+        model_shift_flux, model_shift_flux_clear = _ModelShiftFluenceUncached(camera, vignetting, psfy)
     else:
         raise ValueError("Model value not supported. The `model` arguments should be `fast` or `accurate`.")
 
-    loss = Loss(model_shift_flux)
+    loss = _Loss(model_shift_flux)
     results = minimize(
         lambda args: loss((args[0], args[1], args[2]), sky, camera),
         x0=np.array((sx_start, sy_start, fluence)),
