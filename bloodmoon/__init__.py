@@ -48,9 +48,7 @@ from .mask import codedmask
 from .mask import count
 from .mask import cutout
 from .mask import decode
-from .mask import model_shadowgram
-from .mask import model_sky
 from .mask import snratio
 from .mask import variance
-from .optim import iros
+from .optim import iros, model_shadowgram, model_sky
 from .optim import optimize

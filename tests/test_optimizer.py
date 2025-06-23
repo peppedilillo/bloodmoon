@@ -3,11 +3,10 @@ import unittest
 
 import numpy as np
 
-from bloodmoon import optimize
+from bloodmoon import optimize, model_sky
 from bloodmoon.assets import _path_test_mask
 from bloodmoon.coords import shift2pos
 from bloodmoon.mask import codedmask
-from bloodmoon.mask import model_sky
 
 
 class TestOptimizer(unittest.TestCase):

@@ -15,8 +15,7 @@ class TestAntibilinear(unittest.TestCase):
         try:
             np.testing.assert_array_almost_equal(result, expected, decimal=2)
         except AssertionError:
-            print(f"Weights do not match expected matrix:\n\n{result}")
-            raise
+            raise AssertionError(f"Weights do not match expected matrix:\n\n{result}")
 
     def test_invalid_grid(self):
         with self.assertRaises(ValueError):
@@ -218,7 +217,6 @@ class TestAntibilinear(unittest.TestCase):
             ]
         )
         weights = _rbilinear(1.5, 6.99, bins_x, bins_y)
-        print(weights)
         self.assertWeightsEqual(weights, expected)
 
     def test_right_side(self):
