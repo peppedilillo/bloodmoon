@@ -17,8 +17,7 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.signal import convolve
 
-from bloodmoon.coords import shift2pos
-
+from .coords import shift2pos
 from .images import _erosion
 from .images import _rbilinear
 from .images import _rbilinear_relative
