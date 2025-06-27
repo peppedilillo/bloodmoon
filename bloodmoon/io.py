@@ -16,8 +16,8 @@ from astropy.io import fits
 from astropy.io.fits.fitsrec import FITS_rec
 from astropy.io.fits.header import Header
 
-from bloodmoon.types import CoordEquatorial
-from bloodmoon.types import CoordHorizontal
+from .types import CoordEquatorial
+from .types import CoordHorizontal
 
 
 def _exists_valid(filepath: Path) -> bool:

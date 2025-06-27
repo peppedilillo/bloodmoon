@@ -20,8 +20,7 @@ import numpy.typing as npt
 from scipy.signal import correlate
 from scipy.stats import binned_statistic_2d
 
-from bloodmoon.coords import pos2shift
-
+from .coords import pos2shift
 from .images import _interp
 from .images import _unframe
 from .images import _upscale

@@ -112,8 +112,8 @@ def angle2shift(camera: "CodedMaskCamera", angle: float) -> float:
 def pos2equatorial(
     sdl: SimulationDataLoader,
     camera: "CodedMaskCamera",
-    y: int,
-    x: int,
+    i: int,
+    j: int,
 ) -> CoordEquatorial:
     """
     Convert sky pixel position to corresponding sky-shift coordinates.
@@ -121,8 +121,8 @@ def pos2equatorial(
     Args:
         sdl: SimulationDataLoader containing camera pointings
         camera: A CodedMaskCamera object containing sky shape and binning information.
-        x: Pixel index along the x-axis. integer.
-        y: Pixel index along the y-axis. integer.
+        i: row index
+        j: column index
 
     Returns:
         CoordEquatorial containing:
@@ -135,7 +135,7 @@ def pos2equatorial(
         - resulting RA/Dec refer to the center of the pixel.
         - negative indexes are allowed.
     """
-    return shift2equatorial(sdl, camera, *pos2shift(camera, x, y))
+    return shift2equatorial(sdl, camera, *pos2shift(camera, i, j))
 
 
 def shift2equatorial(
