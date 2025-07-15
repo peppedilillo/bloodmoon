@@ -425,7 +425,7 @@ def cutout(
 
     Args:
         camera: a CodedMaskCameraObject.
-        pos: the (row, col) indeces of the slice center.
+        pos: the (row, col) indexes of the slice center.
 
     Returns:
         A tuple of the slice value (length n) and its bins (length n + 1).
