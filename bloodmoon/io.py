@@ -229,7 +229,7 @@ class MaskDataLoader:
                 - "detector_maxx": bottom physical detector edge along y-axis [mm]
                 - "detector_miny": right physical detector edge along x-axis [mm]
                 - "detector_maxy": top physical detector edge along y-axis [mm]
-                - "mask_detector_distance": detector - bottom mask distance [mm]
+                - "mask_detector_distance": detector - top mask distance [mm]
                 - "open_fraction": mask open fraction
                 - "real_open_fraction": mask open fraction with ribs correction
         """
@@ -250,7 +250,7 @@ class MaskDataLoader:
             "detector_maxx": h1["PLNXMAX"],
             "detector_miny": h1["PLNYMIN"],
             "detector_maxy": h1["PLNYMAX"],
-            "mask_detector_distance": h1["MDDIST"],
+            "mask_detector_distance": h1["MDDIST"] + h1["MASKTHK"],
             "open_fraction": h2["OPENFR"],
             "real_open_fraction": h2["RLOPENFR"],
         }
