@@ -520,14 +520,13 @@ def optimize(
     model: Literal["fast", "accurate"] = "fast",
 ) -> tuple[float, float, float]:
     """
-    Perform two-stage optimization to fit a point source model to sky image data.    # - TO UPDATE
+    Performs the optimization to fit a point source model to sky image data.
 
-    This function performs a two-stage optimization:                                 # - TO UPDATE
-    1. Coarse optimization of fluence only, keeping position fixed                   # - TO UPDATE
-    2. Fine, simultaneous optimization of position and fluence.                      # - TO UPDATE
-       This step is warm-started with the flux value inferred from the coarse step.  # - TO UPDATE
-
-    The process uses different model at each stage to balance speed and accuracy.    # - TO UPDATE
+    This function performs the optimization by simultaneously fit the candidate
+    position and fluence. The starting position is inferred by interpolating the
+    candidate shifts in an upscaled grid (9, 9), while the starting fluence is
+    represented by the counts at the candidate extracted pixel indexes.
+    The model is cached to balance speed and accuracy.
 
     Args:
         camera: CodedMaskCamera instance containing detector and mask parameters
@@ -824,7 +823,7 @@ def iros(
         except Exception as e:
             raise RuntimeError(f"Optimization failed: {str(e)}") from e
 
-        significance = float(snr_map[*arg])  # candidate significance at peak counts
+        significance = float(snr_map[*arg])  # candidate significance at extraction pos
         model = model_sky(
             camera=camera,
             shift_x=shiftx,
