@@ -141,11 +141,11 @@ def apply_vignetting(
     # given the implementation of `erosion` we have presently to multiply `red_factor`
     # by -1 to achieve a cut on the right direction.
     # TODO: change `erosion` and its tests so that multiplying by -1 isn't needed
-    sg1 = _erosion(shadowgram, bins.x[1] - bins.x[0], -red_factor)
+    sg1 = _erosion(shadowgram, bins.x[1] - bins.x[0], red_factor)
 
     angle_y_rad = np.arctan(shift_y / camera.mdl["mask_detector_distance"])
     red_factor = camera.mdl["mask_thickness"] * np.tan(angle_y_rad)
-    sg2 = _erosion(shadowgram.T, bins.y[1] - bins.y[0], -red_factor)
+    sg2 = _erosion(shadowgram.T, bins.y[1] - bins.y[0], red_factor)
     return sg1 * sg2.T
 
 
