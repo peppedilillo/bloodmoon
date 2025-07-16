@@ -17,7 +17,6 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.signal import convolve
 
-from .coords import shift2pos
 from .images import _erosion
 from .images import _rbilinear
 from .images import _rbilinear_relative
@@ -135,12 +134,12 @@ def apply_vignetting(
 
     angle_x_rad = np.arctan(shift_x / camera.mdl["mask_detector_distance"])
     red_factor = camera.mdl["mask_thickness"] * np.tan(angle_x_rad)
-    # since the mask detector distance is assumed to be the distance between the
-    # detector top and the mask bottom, erosion shall cut on the right-side of the
+    # since the mask detector distance is defined as the distance between the
+    # detector top and the mask top, erosion shall cut on the left-side of the
     # shadowgram when sources have negative `angle_x_rad`.
-    # given the implementation of `erosion` we have presently to multiply `red_factor`
-    # by -1 to achieve a cut on the right direction.
-    # TODO: change `erosion` and its tests so that multiplying by -1 isn't needed
+    # if the mask detector distance was defined as the distance between the
+    # detector top and the mask bottom, erosion should have been applied to the
+    # right side, i.e. `red_factor` should be multiplied by -1.
     sg1 = _erosion(shadowgram, bins.x[1] - bins.x[0], red_factor)
 
     angle_y_rad = np.arctan(shift_y / camera.mdl["mask_detector_distance"])

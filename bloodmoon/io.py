@@ -250,6 +250,18 @@ class MaskDataLoader:
             "detector_maxx": h1["PLNXMAX"],
             "detector_miny": h1["PLNYMIN"],
             "detector_maxy": h1["PLNYMAX"],
+            # The mask-detector distance can be defined in several ways:
+            # - Distance between detector top and mask bottom
+            # - Distance between detector top and mask top
+            # - Distance between detector top and mask midpoint
+            # The key requirement is consistency: whichever definition is used here
+            # must match the correction applied in vignetting (see comment in
+            # `apply_vignetting`).
+            # We define the distance as the separation between detector top and mask top.
+            # This choice is empirically motivated: testing showed this definition yields
+            # the best results, though we don't fully understand why. Note that this
+            # differs from the data convention, where mask-detector distance refers to
+            # the separation between detector top and mask bottom.
             "mask_detector_distance": h1["MDDIST"] + h1["MASKTHK"],
             "open_fraction": h2["OPENFR"],
             "real_open_fraction": h2["RLOPENFR"],
