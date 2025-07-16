@@ -33,7 +33,6 @@ from .mask import snratio
 from .mask import variance
 
 
-
 def _modsech(
     x: npt.NDArray,
     norm: float,
@@ -502,9 +501,7 @@ def _Loss(model_f: Callable) -> Callable:  # noqa
         (min_i, max_i, min_j, max_j), _ = cutout(camera, pos, fx=3, fy=3)
         model = model_f(*args)
         residual = model - truth
-        mse = np.mean(
-            np.square(residual[min_i : max_i, min_j : max_j])
-        )
+        mse = np.mean(np.square(residual[min_i:max_i, min_j:max_j]))
         return float(mse)
 
     return f
@@ -553,7 +550,7 @@ def optimize(
         model_shift_flux, model_shift_flux_clear = _ModelShiftFluenceUncached(camera, vignetting, psfy)
     else:
         raise ValueError("Model value not supported. The `model` arguments should be `fast` or `accurate`.")
-    
+
     sx_start, sy_start = interpmax(camera, arg_sky, sky)
     fluence_start = sky[*arg_sky]
     loss = _Loss(model_shift_flux)
@@ -786,7 +783,7 @@ def iros(
             for i, _ in enumerate(sdls):
                 batches[i] = batches[i][:-1]
             return out
-        
+
         return get if max(tuple(snr[*cand] for cand, snr in zip(get(), snrs))) > snr_threshold else lambda: None
 
     def find_candidates(skies: tuple, snrs: tuple, max_pending=6666) -> tuple:
