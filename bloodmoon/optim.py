@@ -485,13 +485,14 @@ def _Loss(model_f: Callable) -> Callable:  # noqa
             - truth is the observed sky image
     """
 
-    def f(args: npt.NDArray, truth: npt.NDArray, camera: CodedMaskCamera) -> float:
+    def f(args: npt.NDArray, truth: npt.NDArray, pos: tuple[int, int], camera: CodedMaskCamera) -> float:
         """
         Compute MSE loss between model prediction and truth.
 
         Args:
             args: Array of [shift_x, shift_y, fluence] parameters to evaluate
             truth: Full observed sky image to compare against
+            pos: the (row, col) indexes of the slice center.
             camera: CodedMaskCamera instance containing geometry information
                     No need for this, but we take the parameter for compatibility with
                     optimization model interfaces.
@@ -499,9 +500,13 @@ def _Loss(model_f: Callable) -> Callable:  # noqa
         Returns:
             float: Mean Squared Error between model and truth in local window
         """
+        (min_i, max_i, min_j, max_j), _ = cutout(camera, pos, fx=3, fy=3)
         model = model_f(*args)
-        mae = np.mean(np.square(model - truth))
-        return float(mae)
+        residual = model - truth
+        mse = np.mean(
+            np.square(residual[min_i : max_i, min_j : max_j])
+        )
+        return float(mse)
 
     return f
 
@@ -515,14 +520,13 @@ def optimize(
     model: Literal["fast", "accurate"] = "fast",
 ) -> tuple[float, float, float]:
     """
-    Perform two-stage optimization to fit a point source model to sky image data.
+    Performs the optimization to fit a point source model to sky image data.
 
-    This function performs a two-stage optimization:
-    1. Coarse optimization of fluence only, keeping position fixed
-    2. Fine, simultaneous optimization of position and fluence.
-       This step is warm-started with the flux value inferred from the coarse step.
-
-    The process uses different model at each stage to balance speed and accuracy.
+    This function performs the optimization by simultaneously fit the candidate
+    position and fluence. The starting position is inferred by interpolating the
+    candidate shifts in an upscaled grid (9, 9), while the starting fluence is
+    represented by the counts at the candidate extracted pixel indexes.
+    The model is cached to balance speed and accuracy.
 
     Args:
         camera: CodedMaskCamera instance containing detector and mask parameters
@@ -541,49 +545,22 @@ def optimize(
         - Initial position is refined using interpolation
         - Bounds are set based on initial guess and physical constraints
     """
-    from bloodmoon.images import argmax
-
-    sx_start, sy_start = interpmax(camera, arg_sky, sky)  # pos2shift(camera, *argmax(sky))
-    fluence_start = sky.max()
-
-    # initialize the function to compute coarse, fluence-dependent shadowgram model.
-    # to reduce the number of cross-correlation the function is cached. it is our
-    # responsibility to clear cache, freeing memory, after we will be done with the
-    # the coarse fluence step.
-    model_fluence, model_fluence_clear = _ModelFluence(camera, vignetting, psfy)
-    loss = _Loss(model_fluence)
-    results = minimize(
-        lambda args: loss((sx_start, sy_start, args[0]), sky, camera),
-        x0=np.array((fluence_start,)),
-        method="L-BFGS-B",
-        bounds=[
-            (0.75 * fluence_start, 1.5 * fluence_start),
-        ],
-        options={
-            "maxiter": 10,
-            "ftol": 1e-4,
-        },
-    )
-    # we use the best fluence value as the initial value for the next step.
-    fluence = results.x[0]
-    # releases model cache memory.
-    model_fluence_clear()
-
-    # initialize the function to fine coarse, fluence and position dependent shadowgram model.
-    # this is slower to compute and requires more memory. again it leverages caches to reduce
-    # the number of cross-correlation computations, and it is our responsibility to free
-    # memory after we will be done.
+    # - initialize the function to fluence and position dependent shadowgram model.
+    # - it leverages caches to reduce the number of cross-correlation computations,
+    #   and it is our responsibility to free memory after we will be done.
     if model == "fast":
         model_shift_flux, model_shift_flux_clear = _ModelShiftFluence(camera, vignetting, psfy)
     elif model == "accurate":
         model_shift_flux, model_shift_flux_clear = _ModelShiftFluenceUncached(camera, vignetting, psfy)
     else:
         raise ValueError("Model value not supported. The `model` arguments should be `fast` or `accurate`.")
-
+    
+    sx_start, sy_start = interpmax(camera, arg_sky, sky)
+    fluence_start = sky[*arg_sky]
     loss = _Loss(model_shift_flux)
     results = minimize(
-        lambda args: loss((args[0], args[1], args[2]), sky, camera),
-        x0=np.array((sx_start, sy_start, fluence)),
+        lambda args: loss((args[0], args[1], args[2]), sky, arg_sky, camera),
+        x0=np.array((sx_start, sy_start, fluence_start)),
         method="Nelder-Mead",
         bounds=[
             (
@@ -594,7 +571,7 @@ def optimize(
                 max(sy_start - camera.mdl["slit_deltay"], camera.bins_sky.y[0]),
                 min(sy_start + camera.mdl["slit_deltay"], camera.bins_sky.y[-1]),
             ),
-            (0.9 * fluence, 1.1 * fluence),
+            (0.9 * fluence_start, 1.1 * fluence_start),
         ],
         options={
             "xatol": 1e-6,
@@ -755,13 +732,13 @@ def iros(
                 return a, latest_b
         return tuple()
 
-    def init_get_arg(snrs: tuple, batchsize: int = 1000) -> Callable:
+    def init_get_arg(skies: tuple, snrs: tuple, batchsize: int = 1000) -> Callable:
         """This hides a reservoirs-batch mechanism for quickly selecting candidates,
         and initializes the data structures it relies on."""
         # we sort source directions by significance.
         # this is kind of costly because the sky arrays may be very large.
         # sorted directions are moved to a reservoir.
-        reservoirs = [np.argsort(snr, axis=None) for snr in snrs]
+        reservoirs = [np.argsort(sky, axis=None) for sky in skies]
 
         # integrating source intensities over aperture for all matrix elements is
         # computationally unfeasable. To avoid this, we execute this computation over small batches.
@@ -770,14 +747,14 @@ def iros(
         def slit_intensity():
             """Integrates source intensity over mask's aperture."""
             intensities = ([], [])
-            for int_, snr, batch in zip(
+            for int_, sky, batch in zip(
                 intensities,
-                snrs,
+                skies,
                 batches,
             ):
                 for arg in batch:
                     (min_i, max_i, min_j, max_j), _ = cutout(camera, arg)
-                    slit = snr[min_i:max_i, min_j:max_j]
+                    slit = sky[min_i:max_i, min_j:max_j]
                     int_.append(np.sum(slit))
             return intensities
 
@@ -785,7 +762,7 @@ def iros(
             """Fill the batches with sorted candidates"""
             for i, _ in enumerate(sdls):
                 tail, head = reservoirs[i][:-batchsize], reservoirs[i][-batchsize:]
-                batches[i] = np.array([np.unravel_index(id, snrs[i].shape) for id in head])
+                batches[i] = np.array([np.unravel_index(id, skies[i].shape) for id in head])
                 reservoirs[i] = tail
 
             # integrates over mask element aperture and sum between cameras
@@ -810,13 +787,13 @@ def iros(
             for i, _ in enumerate(sdls):
                 batches[i] = batches[i][:-1]
             return out
+        
+        return get if max(tuple(snr[*cand] for cand, snr in zip(get(), snrs))) > snr_threshold else lambda: None
 
-        return get if max(map(np.max, snrs)) > snr_threshold else lambda: None
-
-    def find_candidates(snrs: tuple, max_pending=6666) -> tuple:
+    def find_candidates(skies: tuple, snrs: tuple, max_pending=6666) -> tuple:
         """Returns candidate, compatible sources for the two cameras.
         Worst case complexity is O(n^2) but amortized costs are much smaller."""
-        get_arg = init_get_arg(snrs)
+        get_arg = init_get_arg(skies, snrs)
         pending = ([], [])
 
         while not (matches := match(pending)):
@@ -846,7 +823,7 @@ def iros(
         except Exception as e:
             raise RuntimeError(f"Optimization failed: {str(e)}") from e
 
-        significance = float(snr_map[*shift2pos(camera, shiftx, shifty)])
+        significance = float(snr_map[*arg])  # candidate significance at extraction pos
         model = model_sky(
             camera=camera,
             shift_x=shiftx,
@@ -874,7 +851,7 @@ def iros(
     skies = tuple(decode(camera, d) for d in detectors)
     for i in range(max_iterations):
         snrs = compute_snratios(skies, variances)
-        candidates = find_candidates(snrs)
+        candidates = find_candidates(skies, snrs)
         if not candidates:
             break
         try:
