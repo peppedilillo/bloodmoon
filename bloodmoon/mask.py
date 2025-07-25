@@ -402,7 +402,13 @@ def count(
     """
     bins = camera.bins_detector
     counts, *_ = np.histogram2d(data["Y"], data["X"], bins=[bins.y, bins.x])
-    return counts, bins
+    # - we mask the binned detector counts for the camera bulk to remove
+    #   those photons that fall in the dead zone
+    # PN: we do NOT multiply for the bulk, since we do not want to modify
+    #     the observed data (the bulk represents the sensitivity profile
+    #     of the detector and generally has values in the [0, 1] interval)
+    bulk_mask = (camera.bulk > 0)
+    return counts * bulk_mask, bins
 
 
 def _detector_footprint(camera: CodedMaskCamera) -> tuple[int, int, int, int]:
