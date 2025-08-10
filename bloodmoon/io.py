@@ -226,8 +226,8 @@ class MaskDataLoader:
                 - "slit_deltax": slit length along x [mm]
                 - "slit_deltay": slit length along y [mm]
                 - "detector_minx": left physical detector edge along x-axis [mm]
-                - "detector_maxx": bottom physical detector edge along y-axis [mm]
-                - "detector_miny": right physical detector edge along x-axis [mm]
+                - "detector_maxx": right physical detector edge along x-axis [mm]
+                - "detector_miny": bottom physical detector edge along y-axis [mm]
                 - "detector_maxy": top physical detector edge along y-axis [mm]
                 - "mask_detector_distance": detector - top mask distance [mm]
                 - "open_fraction": mask open fraction
