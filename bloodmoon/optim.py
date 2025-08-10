@@ -107,11 +107,25 @@ def apply_vignetting(
     shift_x: float,
     shift_y: float,
 ) -> npt.NDArray:
-    """
+    r"""
     Apply vignetting effects to a shadowgram based on source position.
     Vignetting occurs when mask thickness causes partial shadowing at off-axis angles.
     This function models this effect by applying erosion operations in both x and y
     directions based on the source's angular displacement from the optical axis.
+    
+
+                                    <--------> MASK APERTURE
+
+                                  \       \  \ 
+                        ___________\       \  \____________
+                                   |\       \ |             MASK ELEMENT
+                        ___________| \       \|_____________
+                                      \       \  \ 
+                                       \       \  \ 
+                                        \       \  \ 
+                         ________________\_______\__\_________  DETECTOR
+                         <--------------->        <->
+                               SHIFT             EROSION
 
     Args:
         camera: CodedMaskCamera instance containing mask and detector geometry
