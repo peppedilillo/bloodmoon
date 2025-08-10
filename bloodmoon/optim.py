@@ -112,20 +112,20 @@ def apply_vignetting(
     Vignetting occurs when mask thickness causes partial shadowing at off-axis angles.
     This function models this effect by applying erosion operations in both x and y
     directions based on the source's angular displacement from the optical axis.
-    
 
-                                    <--------> MASK APERTURE
 
-                                  \       \  \ 
-                        ___________\       \  \____________
-                                   |\       \ |             MASK ELEMENT
-                        ___________| \       \|_____________
-                                      \       \  \ 
-                                       \       \  \ 
-                                        \       \  \ 
-                         ________________\_______\__\_________  DETECTOR
-                         <--------------->        <->
-                               SHIFT             EROSION
+                <--------> MASK APERTURE
+
+              \       \  \
+    ___________\       \  \____________
+                \       \              MASK ELEMENT
+    ___________  \       \ _____________
+                  \       \  x
+                   \       \  x
+                    \       \  x
+     ________________\_______\__x_________  DETECTOR
+     <--------------->        <->
+           SHIFT             EROSION
 
     Args:
         camera: CodedMaskCamera instance containing mask and detector geometry
