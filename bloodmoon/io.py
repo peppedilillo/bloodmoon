@@ -12,25 +12,33 @@ from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
 
+import numpy as np
 from astropy.io import fits
 from astropy.io.fits.fitsrec import FITS_rec
 from astropy.io.fits.header import Header
+from numpy import typing as npt
+from scipy.stats import binned_statistic_2d
 
-from .types import CoordEquatorial
+from .types import CoordEquatorial, BinsRectangular
 from .types import CoordHorizontal
 
 
-def _exists_valid(filepath: Path) -> bool:
+def validate_fits(filepath: Path | str) -> bool:
     """
-    Checks presence and validity of the FITS file.
+    Validate presence and format of FITS file.
+
+    Checks if the specified file exists and has a valid FITS format signature.
+    Supports both string paths and Path objects.
+
     Args:
-        filepath: Path to the FITS file.
+        filepath: Path to the FITS file to validate
 
     Returns:
-        output: True if FITS exists and in valid format.
+        True if file exists and has valid FITS format
+
     Raises:
-        FileNotFoundError: If FITS file does not exist.
-        ValueError: If file not in valid FITS format.
+        FileNotFoundError: If FITS file does not exist
+        ValueError: If file is not in valid FITS format
     """
 
     def validate_signature(filepath: Path) -> bool:
@@ -180,139 +188,81 @@ def simulation(filepath: str | Path) -> SimulationDataLoader:
     Returns:
         a SimulationDataLoader dataclass.
     """
-    if _exists_valid(Path(filepath)):
+    if validate_fits(Path(filepath)):
         sdl = SimulationDataLoader(filepath)
     return sdl
 
 
-@dataclass(frozen=True)
-class MaskDataLoader:
+def _fold(
+    ml: FITS_rec,
+    mask_bins: BinsRectangular,
+) -> npt.NDArray:
     """
-    Container for WFM coded mask parameters and patterns.
-
-    The class provides access to mask geometry, decoder patterns, and associated
-    parameters from a single FITS file containing WFM mask data.
-
-    Attributes:
-        filepath: Path to the FITS file
-
-    Properties:
-        specs: Dictionary of mask and detector dimensions
-        mask: Mask pattern data from extension 2
-        decoder: Decoder pattern data from extension 3
-        bulk: Bulk pattern data from extension 4
-    """
-
-    filepath: Path
-
-    def __getitem__(self, key: str) -> float:
-        """Access mask parameters via dictionary-style lookup."""
-        return self.specs[key]
-
-    @cached_property
-    def specs(self) -> dict[str, float]:
-        """
-        Extract and convert mask parameters from FITS headers (extensions 0 and 2).
-
-        Returns:
-            Dictionary of mask parameters (dimensions, bounds, distances) as float values:
-                - "mask_minx": left physical mask edge along x-axis [mm]
-                - "mask_miny": bottom physical mask edge along y-axis [mm]
-                - "mask_maxx": right physical mask edge along x-axis [mm]
-                - "mask_maxy": top physical mask edge along y-axis [mm]
-                - "mask_deltax": mask pixel physical dimension along x [mm]
-                - "mask_deltay": mask pixel physical dimension along y [mm]
-                - "mask_thickness": mask plate thickness [mm]
-                - "slit_deltax": slit length along x [mm]
-                - "slit_deltay": slit length along y [mm]
-                - "detector_minx": left physical detector edge along x-axis [mm]
-                - "detector_maxx": right physical detector edge along x-axis [mm]
-                - "detector_miny": bottom physical detector edge along y-axis [mm]
-                - "detector_maxy": top physical detector edge along y-axis [mm]
-                - "mask_detector_distance": detector - top mask distance [mm]
-                - "open_fraction": mask open fraction
-                - "real_open_fraction": mask open fraction with ribs correction
-        """
-        h1 = dict(fits.getheader(self.filepath, ext=0)) | dict(fits.getheader(self.filepath, ext=2))
-        h2 = dict(fits.getheader(self.filepath, ext=3))
-
-        info = {
-            "mask_minx": h1["MINX"],
-            "mask_miny": h1["MINY"],
-            "mask_maxx": h1["MAXX"],
-            "mask_maxy": h1["MAXY"],
-            "mask_deltax": h1["ELXDIM"],
-            "mask_deltay": h1["ELYDIM"],
-            "mask_thickness": h1["MASKTHK"],
-            "slit_deltax": h1["DXSLIT"],
-            "slit_deltay": h1["DYSLIT"],
-            "detector_minx": h1["PLNXMIN"],
-            "detector_maxx": h1["PLNXMAX"],
-            "detector_miny": h1["PLNYMIN"],
-            "detector_maxy": h1["PLNYMAX"],
-            # The mask-detector distance can be defined in several ways:
-            # - Distance between detector top and mask bottom
-            # - Distance between detector top and mask top
-            # - Distance between detector top and mask midpoint
-            # The key requirement is consistency: whichever definition is used here
-            # must match the correction applied in vignetting (see comment in
-            # `apply_vignetting`).
-            # We define the distance as the separation between detector top and mask top.
-            # This choice is empirically motivated: testing showed this definition yields
-            # the best results, though we don't fully understand why. Note that this
-            # differs from the data convention, where mask-detector distance refers to
-            # the separation between detector top and mask bottom.
-            "mask_detector_distance": h1["MDDIST"] + h1["MASKTHK"],
-            "open_fraction": h2["OPENFR"],
-            "real_open_fraction": h2["RLOPENFR"],
-        }
-
-        return {k: float(v) for k, v in info.items()}
-
-    @property
-    def mask(self) -> fits.FITS_rec:
-        """
-        Load mask data from mask FITS file.
-
-        Returns:
-            FITS record array containing mask data
-        """
-        return fits.getdata(self.filepath, ext=2)
-
-    @property
-    def decoder(self) -> fits.FITS_rec:
-        """
-        Load decoder data from mask FITS file.
-
-        Returns:
-            FITS record array containing decoder data
-        """
-        return fits.getdata(self.filepath, ext=3)
-
-    @property
-    def bulk(self) -> fits.FITS_rec:
-        """
-        Load bulk data from mask FITS file.
-
-        Returns:
-            FITS record array containing bulk data
-        """
-        return fits.getdata(self.filepath, ext=4)
-
-
-def fetch_mask(filepath: str | Path) -> MaskDataLoader:
-    """
-    Checks data and intializes MaskDataLoader.
+    Convert mask data from FITS record to 2D binned array.
 
     Args:
-        filepath: path to mask FITS file.
+        ml: FITS record containing mask data
+        mask_bins: Binning structure for the mask
 
     Returns:
-        a MaskDataLoader dataclass.
+        2D array containing binned mask data
     """
-    if _exists_valid(Path(filepath)):
-        mdl = MaskDataLoader(Path(filepath))
-    return mdl
+    return binned_statistic_2d(ml["X"], ml["Y"], ml["VAL"], statistic="max", bins=[mask_bins.x, mask_bins.y])[0].T
+
+
+def load_from_fits(filepath: str | Path) -> tuple:
+    """
+    Load mask data and specifications from FITS file.
+
+    Extracts mask patterns, decoder patterns, bulk patterns, and geometric
+    specifications from a coded mask FITS file. Returns callable thunks for
+    lazy loading of array data.
+
+    Args:
+        filepath: Path to the mask FITS file
+
+    Returns:
+        Tuple containing:
+            - get_mask: Callable that returns mask pattern as 2D array
+            - get_decoder: Callable that returns decoder pattern as 2D array
+            - get_bulk: Callable that returns bulk pattern as 2D array
+            - specs: Dictionary of mask specifications and geometric parameters
+    """
+    h0 = dict(fits.getheader(filepath, ext=0))
+    specs = {
+        "detector_minx": h0["PLNXMIN"],
+        "detector_maxx": h0["PLNXMAX"],
+        "detector_miny": h0["PLNYMIN"],
+        "detector_maxy": h0["PLNYMAX"],
+        "mask_thickness": h0["MASKTHK"],
+        "mask_detector_distance": h0["MDDIST"] + h0["MASKTHK"],
+    }
+    h2 = dict(fits.getheader(filepath, ext=2))
+    specs |= {
+        "mask_minx": h2["MINX"],
+        "mask_miny": h2["MINY"],
+        "mask_maxx": h2["MAXX"],
+        "mask_maxy": h2["MAXY"],
+        "slit_deltax": h2["DXSLIT"],
+        "slit_deltay": h2["DYSLIT"],
+    }
+    h3 = dict(fits.getheader(filepath, ext=3))
+    specs |= {
+        "mask_deltax": h3["ELXDIM"],
+        "mask_deltay": h3["ELYDIM"],
+    }
+
+    l, r = specs["mask_minx"], specs["mask_maxx"]
+    b, t = specs["mask_miny"], specs["mask_maxy"]
+    mask_bins = BinsRectangular(
+        np.linspace(l, r, int((r - l) / specs["mask_deltax"]) + 1),
+        np.linspace(b, t, int((t - b) / specs["mask_deltay"]) + 1),
+    )
+
+    get_mask = lambda : _fold(fits.getdata(filepath, ext=2), mask_bins).astype(int)
+    get_decoder = lambda : _fold(fits.getdata(filepath, ext=3), mask_bins).astype(int)
+    get_bulk = lambda : _fold(fits.getdata(filepath, ext=4), mask_bins).astype(int)
+    return get_mask, get_decoder, get_bulk, specs
 
 
 """

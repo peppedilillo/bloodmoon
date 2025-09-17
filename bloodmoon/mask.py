@@ -13,6 +13,7 @@ from bisect import bisect_right
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
+from typing import Callable
 
 from astropy.io.fits.fitsrec import FITS_rec
 import numpy as np
@@ -21,11 +22,12 @@ from scipy.signal import correlate
 from scipy.stats import binned_statistic_2d
 
 from .coords import pos2shift
+from .io import validate_fits
+from .io import load_from_fits
 from .images import _interp
 from .images import _unframe
 from .images import _upscale
 from .images import argmax
-from .io import MaskDataLoader
 from .types import BinsRectangular
 from .types import UpscaleFactor
 
@@ -79,6 +81,35 @@ def _bisect_interval(
     return bisect_right(a, start) - 1, bisect_left(a, stop)
 
 
+@dataclass(frozen=True)
+class CodedMaskSpecs:
+    detector_minx: float
+    detector_maxx: float
+    detector_miny: float
+    detector_maxy: float
+    mask_deltax: float
+    mask_deltay: float
+    mask_thickness: float
+    mask_minx: float
+    mask_miny: float
+    mask_maxx: float
+    mask_maxy: float
+    slit_deltax: float
+    slit_deltay: float
+    # The mask-detector distance can be defined in several ways:
+    # - Distance between detector top and mask bottom
+    # - Distance between detector top and mask top
+    # - Distance between detector top and mask midpoint
+    # The key requirement is consistency: whichever definition is used here
+    # must match the correction applied in vignetting (see comment in
+    # `apply_vignetting`).
+    # We define the distance as the separation between detector top and mask top.
+    # This choice is empirically motivated: testing showed this definition yields
+    # the best results, though we don't fully understand why. Note that this
+    # differs from the data convention, where mask-detector distance refers to
+    # the separation between detector top and mask bottom.
+    mask_detector_distance: float
+
 """
 last one 
 i swear
@@ -99,30 +130,35 @@ class CodedMaskCamera:
     Dataclass containing a coded mask camera system.
 
     Handles mask pattern, detector geometry, and related calculations for coded mask imaging.
+    Uses callable thunks for lazy loading of mask data to maintain hashability and performance.
 
     Args:
-        mdl: Mask data loader object containing mask and detector specifications
+        get_mask: Callable that returns mask pattern as 2D array
+        get_decoder: Callable that returns decoder pattern as 2D array
+        get_bulk: Callable that returns bulk pattern as 2D array
+        specs: CodedMaskSpecs containing geometric parameters and dimensions
         upscale_f: Tuple of upscaling factors for x and y dimensions
 
     Raises:
         ValueError: If detector plane is larger than mask or if upscale factors are not positive
     """
-
-    mdl: MaskDataLoader
+    # note that we are taking thunks here, rather than the actual array.
+    # two reasons for this:
+    #   1. python functions are hashable and using thunks keeps camera objects hashable themselves.
+    #   2. reading data may take time. thunk delays this expensive operation.
+    get_mask: Callable[[], npt.NDArray]
+    get_decoder: Callable[[], npt.NDArray]
+    get_bulk: Callable[[], npt.NDArray]
+    specs: CodedMaskSpecs
     upscale_f: UpscaleFactor
-
-    @property
-    def specs(self) -> dict:
-        """Returns a dictionary of mask parameters useful for image reconstruction."""
-        return self.mdl.specs
 
     @cached_property
     def shape_detector(self) -> tuple[int, int]:
         """Shape of the detector array (rows, columns)."""
-        xmin = np.floor(self.mdl["detector_minx"] / (self.mdl["mask_deltax"] / self.upscale_f.x))
-        xmax = np.ceil(self.mdl["detector_maxx"] / (self.mdl["mask_deltax"] / self.upscale_f.x))
-        ymin = np.floor(self.mdl["detector_miny"] / (self.mdl["mask_deltay"] / self.upscale_f.y))
-        ymax = np.ceil(self.mdl["detector_maxy"] / (self.mdl["mask_deltay"] / self.upscale_f.y))
+        xmin = np.floor(self.specs.detector_minx / (self.specs.mask_deltax / self.upscale_f.x))
+        xmax = np.ceil(self.specs.detector_maxx / (self.specs.mask_deltax / self.upscale_f.x))
+        ymin = np.floor(self.specs.detector_miny / (self.specs.mask_deltay / self.upscale_f.y))
+        ymax = np.ceil(self.specs.detector_maxy / (self.specs.mask_deltay / self.upscale_f.y))
         return int(ymax - ymin), int(xmax - xmin)
 
     @cached_property
@@ -130,8 +166,8 @@ class CodedMaskCamera:
         """Shape of the mask array (rows, columns)."""
         # there is no need for this since we can just `mask.shape` but since we have the other already..
         return (
-            int((self.mdl["mask_maxy"] - self.mdl["mask_miny"]) / (self.mdl["mask_deltay"] / self.upscale_f.y)),
-            int((self.mdl["mask_maxx"] - self.mdl["mask_minx"]) / (self.mdl["mask_deltax"] / self.upscale_f.x)),
+            int((self.specs.mask_maxy - self.specs.mask_miny) / (self.specs.mask_deltay / self.upscale_f.y)),
+            int((self.specs.mask_maxx - self.specs.mask_minx) / (self.specs.mask_deltax / self.upscale_f.x)),
         )
 
     @cached_property
@@ -142,14 +178,14 @@ class CodedMaskCamera:
         return n + o - 1, m + p - 1
 
     def _bins_mask(
-        self,
-        upscale_f: UpscaleFactor,
+            self,
+            upscale_f: UpscaleFactor,
     ) -> BinsRectangular:
         """Returns bins for mask with given upscale factors."""
-        l, r = self.mdl["mask_minx"], self.mdl["mask_maxx"]
-        b, t = self.mdl["mask_miny"], self.mdl["mask_maxy"]
-        xsteps = int((r - l) / (self.mdl["mask_deltax"] / upscale_f.x)) + 1
-        ysteps = int((t - b) / (self.mdl["mask_deltay"] / upscale_f.y)) + 1
+        l, r = self.specs.mask_minx, self.specs.mask_maxx
+        b, t = self.specs.mask_miny, self.specs.mask_maxy
+        xsteps = int((r - l) / (self.specs.mask_deltax / upscale_f.x)) + 1
+        ysteps = int((t - b) / (self.specs.mask_deltay / upscale_f.y)) + 1
         return BinsRectangular(np.linspace(l, r, xsteps), np.linspace(b, t, ysteps))
 
     @cached_property
@@ -174,10 +210,10 @@ class CodedMaskCamera:
                 │               │
            detector_min   detector_max
         """
-        bins = self._bins_mask(self.upscale_f)
-        jmin, jmax = _bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
-        imin, imax = _bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
-        return BinsRectangular(self.bins_mask.x[jmin : jmax + 1], self.bins_mask.y[imin : imax + 1])
+        bins = self._bins_mask(upscale_f)
+        jmin, jmax = _bisect_interval(bins.x, self.specs.detector_minx, self.specs.detector_maxx)
+        imin, imax = _bisect_interval(bins.y, self.specs.detector_miny, self.specs.detector_maxy)
+        return BinsRectangular(self.bins_mask.x[jmin: jmax + 1], self.bins_mask.y[imin: imax + 1])
 
     @cached_property
     def bins_detector(self) -> BinsRectangular:
@@ -224,28 +260,22 @@ class CodedMaskCamera:
     @cached_property
     def mask(self) -> npt.NDArray:
         """2D array representing the coded mask pattern."""
-        return _upscale(
-            _fold(self.mdl.mask, self._bins_mask(UpscaleFactor(1, 1))).astype(int),
-            *self.upscale_f,
-        )
+        return _upscale(self.get_mask(), *self.upscale_f)
 
     @cached_property
     def decoder(self) -> npt.NDArray:
         """2D array representing the mask pattern used for decoding."""
-        return _upscale(
-            _fold(self.mdl.decoder, self._bins_mask(UpscaleFactor(1, 1))),
-            *self.upscale_f,
-        )
+        return _upscale(self.get_decoder(), *self.upscale_f)
 
     @cached_property
     def bulk(self) -> npt.NDArray:
         """2D array representing the bulk (sensitivity) array of the mask."""
-        framed_bulk = _fold(self.mdl.bulk, self._bins_mask(UpscaleFactor(1, 1)))
-        framed_bulk[~np.isclose(framed_bulk, np.zeros_like(framed_bulk))] = 1
+        bulk = self.get_bulk()
+        bulk[~np.isclose(bulk, np.zeros_like(bulk))] = 1
         bins = self._bins_mask(self.upscale_f)
-        xmin, xmax = _bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
-        ymin, ymax = _bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
-        return _upscale(framed_bulk, *self.upscale_f)[ymin:ymax, xmin:xmax]
+        xmin, xmax = _bisect_interval(bins.x, self.specs.detector_minx, self.specs.detector_maxx)
+        ymin, ymax = _bisect_interval(bins.y, self.specs.detector_miny, self.specs.detector_maxy)
+        return _upscale(bulk, *self.upscale_f)[ymin:ymax, xmin:xmax]
 
     @cached_property
     def balancing(self) -> npt.NDArray:
@@ -254,40 +284,52 @@ class CodedMaskCamera:
 
 
 def codedmask(
-    mask_filepath: str | Path,
-    upscale_x: int = 1,
-    upscale_y: int = 1,
+        mask_filepath: str | Path,
+        upscale_x: int = 1,
+        upscale_y: int = 1,
 ) -> CodedMaskCamera:
     """
-    An interface to CodedMaskCamera.
+    Create a CodedMaskCamera from FITS file data.
+
+    Loads mask patterns and specifications from a FITS file and creates a
+    CodedMaskCamera instance with lazy-loaded array data.
 
     Args:
-        mask_filepath: a str or a path object pointing to the mask filepath
-        upscale_x: upscaling factor over the x direction
-        upscale_y: upscaling factor over the y direction
+        mask_filepath: Path to the mask FITS file
+        upscale_x: Upscaling factor for x direction (default: 1)
+        upscale_y: Upscaling factor for y direction (default: 1)
 
     Returns:
-        a CodedMaskCamera object.
+        CodedMaskCamera object containing mask patterns and specifications
 
     Raises:
-        ValueError: for invalid upscale factors.
+        ValueError: If detector plane is larger than mask or upscale factors are invalid
+        NotImplementedError: If mask_filepath is not a valid FITS file
     """
-    mdl = MaskDataLoader(mask_filepath)
+    if validate_fits(mask_filepath):
+        mask, decoder, bulk, specs_dict = load_from_fits(mask_filepath)
+        specs = CodedMaskSpecs(**specs_dict)
+        if not (
+                # fmt: off
+                specs.detector_minx >= specs.mask_minx and
+                specs.detector_maxx <= specs.mask_maxx and
+                specs.detector_miny >= specs.mask_miny and
+                specs.detector_maxy <= specs.mask_maxy
+                # fmt: on
+        ):
+            raise ValueError("Detector plane is larger than mask.")
 
-    if not (
-        # fmt: off
-        mdl["detector_minx"] >= mdl["mask_minx"] and
-        mdl["detector_maxx"] <= mdl["mask_maxx"] and
-        mdl["detector_miny"] >= mdl["mask_miny"] and
-        mdl["detector_maxy"] <= mdl["mask_maxy"]
-        # fmt: on
-    ):
-        raise ValueError("Detector plane is larger than mask.")
+        if not ((isinstance(upscale_x, int) and upscale_x > 0) and (isinstance(upscale_y, int) and upscale_y > 0)):
+            raise ValueError("Upscale factors must be positive integers.")
 
-    if not ((isinstance(upscale_x, int) and upscale_x > 0) and (isinstance(upscale_y, int) and upscale_y > 0)):
-        raise ValueError("Upscale factors must be positive integers.")
-
-    return CodedMaskCamera(mdl, UpscaleFactor(x=upscale_x, y=upscale_y))
+        return CodedMaskCamera(
+            get_mask=mask,
+            get_decoder=decoder,
+            get_bulk=bulk,
+            specs=specs,
+            upscale_f=UpscaleFactor(x=upscale_x, y=upscale_y)
+        )
+    raise NotImplementedError("Only reading masks from fits file is supported.")
 
 
 def encode(
@@ -440,13 +482,13 @@ def cutout(
     sx, sy = pos2shift(camera, *pos)
     min_i, max_i = _bisect_interval(
         bins.y,
-        max(sy - camera.mdl["slit_deltay"] * (fy / 2), bins.y[0]),
-        min(sy + camera.mdl["slit_deltay"] * (fy / 2), bins.y[-1]),
+        max(sy - camera.specs.slit_deltay * (fy / 2), bins.y[0]),
+        min(sy + camera.specs.slit_deltay * (fy / 2), bins.y[-1]),
     )
     min_j, max_j = _bisect_interval(
         bins.x,
-        max(sx - camera.mdl["slit_deltax"] * (fx / 2), bins.x[0]),
-        min(sx + camera.mdl["slit_deltax"] * (fx / 2), bins.x[-1]),
+        max(sx - camera.specs.slit_deltax * (fx / 2), bins.x[0]),
+        min(sx + camera.specs.slit_deltax * (fx / 2), bins.x[-1]),
     )
     return (min_i, max_i, min_j, max_j), BinsRectangular(
         x=bins.x[min_j : max_j + 1],

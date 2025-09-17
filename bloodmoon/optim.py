@@ -87,7 +87,7 @@ def _wfm_psfy_kernel(camera: CodedMaskCamera) -> npt.NDArray:
         A column array convolution kernel.
     """
     bins = camera.bins_detector
-    min_bin, max_bin = _bisect_interval(bins.y, -camera.mdl["slit_deltay"], camera.mdl["slit_deltay"])
+    min_bin, max_bin = _bisect_interval(bins.y, -camera.specs.slit_deltay, camera.specs.slit_deltay)
     bin_edges = bins.y[min_bin : max_bin + 1]
     midpoints = (bin_edges[1:] + bin_edges[:-1]) / 2
     kernel = _wfm_psfy(midpoints).reshape(len(midpoints), -1)
@@ -145,8 +145,8 @@ def apply_vignetting(
     """
     bins = camera.bins_detector
 
-    angle_x_rad = np.arctan(shift_x / camera.mdl["mask_detector_distance"])
-    red_factor = camera.mdl["mask_thickness"] * np.tan(angle_x_rad)
+    angle_x_rad = np.arctan(shift_x / camera.specs.mask_detector_distance)
+    red_factor = camera.specs.mask_thickness * np.tan(angle_x_rad)
     # since the mask detector distance is defined as the distance between the
     # detector top and the mask top, erosion shall cut on the left-side of the
     # shadowgram when sources have negative `angle_x_rad`.
@@ -155,8 +155,8 @@ def apply_vignetting(
     # right side, i.e. `red_factor` should be multiplied by -1.
     sg1 = _erosion(shadowgram, bins.x[1] - bins.x[0], red_factor)
 
-    angle_y_rad = np.arctan(shift_y / camera.mdl["mask_detector_distance"])
-    red_factor = camera.mdl["mask_thickness"] * np.tan(angle_y_rad)
+    angle_y_rad = np.arctan(shift_y / camera.specs.mask_detector_distance)
+    red_factor = camera.specs.mask_thickness * np.tan(angle_y_rad)
     sg2 = _erosion(shadowgram.T, bins.y[1] - bins.y[0], red_factor)
     return sg1 * sg2.T
 
@@ -574,12 +574,12 @@ def optimize(
         method="Nelder-Mead",
         bounds=[
             (
-                max(sx_start - camera.mdl["slit_deltax"], camera.bins_sky.x[0]),
-                min(sx_start + camera.mdl["slit_deltax"], camera.bins_sky.x[-1]),
+                max(sx_start - camera.specs.slit_deltax, camera.bins_sky.x[0]),
+                min(sx_start + camera.specs.slit_deltax, camera.bins_sky.x[-1]),
             ),
             (
-                max(sy_start - camera.mdl["slit_deltay"], camera.bins_sky.y[0]),
-                min(sy_start + camera.mdl["slit_deltay"], camera.bins_sky.y[-1]),
+                max(sy_start - camera.specs.slit_deltay, camera.bins_sky.y[0]),
+                min(sy_start + camera.specs.slit_deltay, camera.bins_sky.y[-1]),
             ),
             (0.9 * fluence_start, 1.1 * fluence_start),
         ],
@@ -718,7 +718,7 @@ def iros(
         ax, ay = camera.bins_sky.x[a[1]], camera.bins_sky.y[a[0]]
         # we apply -90deg rotation to camera b source
         bx, by = -camera.bins_sky.y[b[0]], camera.bins_sky.x[b[1]]
-        min_slit = min(camera.mdl["slit_deltax"], camera.mdl["slit_deltay"])
+        min_slit = min(camera.specs.slit_deltax, camera.specs.slit_deltay)
         return abs(ax - bx) < min_slit and abs(ay - by) < min_slit
 
     def match(pending: tuple) -> tuple:

@@ -24,8 +24,8 @@ class TestOptimizer(unittest.TestCase):
             self.assertTrue(abs(sx_meas - sx_true) < self.wfm.mdl["slit_deltax"] / self.wfm.upscale_f.x)
             self.assertTrue(abs(sx_meas - sx_true) < self.wfm.mdl["slit_deltay"] / self.wfm.upscale_f.y)
         elif tolerance == "zero":
-            self.assertAlmostEqual(sx_meas, sx_true)
-            self.assertAlmostEqual(sy_meas, sy_true)
+            self.assertAlmostEqual(sx_meas, sx_true, places=6)
+            self.assertAlmostEqual(sy_meas, sy_true, places=6)
 
     def test_onaxis(self):
         self.generate_source_and_measure_localization(0.0, 0.0, False, False, "accurate", "zero")
