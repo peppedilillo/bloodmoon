@@ -22,12 +22,12 @@ from scipy.signal import correlate
 from scipy.stats import binned_statistic_2d
 
 from .coords import pos2shift
-from .io import validate_fits
-from .io import load_from_fits
 from .images import _interp
 from .images import _unframe
 from .images import _upscale
 from .images import argmax
+from .io import load_from_fits
+from .io import validate_fits
 from .types import BinsRectangular
 from .types import UpscaleFactor
 
@@ -110,6 +110,7 @@ class CodedMaskSpecs:
     # the separation between detector top and mask bottom.
     mask_detector_distance: float
 
+
 """
 last one 
 i swear
@@ -142,6 +143,7 @@ class CodedMaskCamera:
     Raises:
         ValueError: If detector plane is larger than mask or if upscale factors are not positive
     """
+
     # note that we are taking thunks here, rather than the actual array.
     # two reasons for this:
     #   1. python functions are hashable and using thunks keeps camera objects hashable themselves.
@@ -178,8 +180,8 @@ class CodedMaskCamera:
         return n + o - 1, m + p - 1
 
     def _bins_mask(
-            self,
-            upscale_f: UpscaleFactor,
+        self,
+        upscale_f: UpscaleFactor,
     ) -> BinsRectangular:
         """Returns bins for mask with given upscale factors."""
         l, r = self.specs.mask_minx, self.specs.mask_maxx
@@ -213,7 +215,7 @@ class CodedMaskCamera:
         bins = self._bins_mask(upscale_f)
         jmin, jmax = _bisect_interval(bins.x, self.specs.detector_minx, self.specs.detector_maxx)
         imin, imax = _bisect_interval(bins.y, self.specs.detector_miny, self.specs.detector_maxy)
-        return BinsRectangular(self.bins_mask.x[jmin: jmax + 1], self.bins_mask.y[imin: imax + 1])
+        return BinsRectangular(self.bins_mask.x[jmin : jmax + 1], self.bins_mask.y[imin : imax + 1])
 
     @cached_property
     def bins_detector(self) -> BinsRectangular:
@@ -284,9 +286,9 @@ class CodedMaskCamera:
 
 
 def codedmask(
-        mask_filepath: str | Path,
-        upscale_x: int = 1,
-        upscale_y: int = 1,
+    mask_filepath: str | Path,
+    upscale_x: int = 1,
+    upscale_y: int = 1,
 ) -> CodedMaskCamera:
     """
     Create a CodedMaskCamera from FITS file data.
@@ -310,12 +312,12 @@ def codedmask(
         mask, decoder, bulk, specs_dict = load_from_fits(mask_filepath)
         specs = CodedMaskSpecs(**specs_dict)
         if not (
-                # fmt: off
+            # fmt: off
                 specs.detector_minx >= specs.mask_minx and
                 specs.detector_maxx <= specs.mask_maxx and
                 specs.detector_miny >= specs.mask_miny and
                 specs.detector_maxy <= specs.mask_maxy
-                # fmt: on
+            # fmt: on
         ):
             raise ValueError("Detector plane is larger than mask.")
 
@@ -327,7 +329,7 @@ def codedmask(
             get_decoder=decoder,
             get_bulk=bulk,
             specs=specs,
-            upscale_f=UpscaleFactor(x=upscale_x, y=upscale_y)
+            upscale_f=UpscaleFactor(x=upscale_x, y=upscale_y),
         )
     raise NotImplementedError("Only reading masks from fits file is supported.")
 
@@ -449,7 +451,7 @@ def count(
     # PN: we do NOT multiply for the bulk, since we do not want to modify
     #     the observed data (the bulk represents the sensitivity profile
     #     of the detector and generally has values in the [0, 1] interval)
-    bulk_mask = (camera.bulk > 0)
+    bulk_mask = camera.bulk > 0
     return counts * bulk_mask, bins
 
 

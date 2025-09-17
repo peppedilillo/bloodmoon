@@ -12,14 +12,15 @@ from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
 
-import numpy as np
 from astropy.io import fits
 from astropy.io.fits.fitsrec import FITS_rec
 from astropy.io.fits.header import Header
 from numpy import typing as npt
+import numpy as np
 from scipy.stats import binned_statistic_2d
 
-from .types import CoordEquatorial, BinsRectangular
+from .types import BinsRectangular
+from .types import CoordEquatorial
 from .types import CoordHorizontal
 
 
@@ -259,9 +260,9 @@ def load_from_fits(filepath: str | Path) -> tuple:
         np.linspace(b, t, int((t - b) / specs["mask_deltay"]) + 1),
     )
 
-    get_mask = lambda : _fold(fits.getdata(filepath, ext=2), mask_bins).astype(int)
-    get_decoder = lambda : _fold(fits.getdata(filepath, ext=3), mask_bins).astype(int)
-    get_bulk = lambda : _fold(fits.getdata(filepath, ext=4), mask_bins).astype(int)
+    get_mask = lambda: _fold(fits.getdata(filepath, ext=2), mask_bins).astype(int)
+    get_decoder = lambda: _fold(fits.getdata(filepath, ext=3), mask_bins).astype(int)
+    get_bulk = lambda: _fold(fits.getdata(filepath, ext=4), mask_bins).astype(int)
     return get_mask, get_decoder, get_bulk, specs
 
 
