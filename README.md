@@ -1,8 +1,3 @@
-
-<div align="center">
-<img src="images/heavy_light_flooded.png" alt="Heavy light flooded across the landscape, cloaking everything in deep crimson. (please WotC don't sue)" width="200"/>
-</div>
-
 # Bloodmoon
 
 A Python library for analyzing data from the Wide Field Monitor (WFM) coded mask instrument. Bloodmoon provides tools for:
@@ -105,3 +100,8 @@ Contributions are welcome! Before submitting a pull request:
 3. Sort imports with isort: `isort --profile=google .`
 
 For bug reports and feature requests, please open an issue.
+
+
+<div align="center">
+<img src="images/heavy_light_flooded.png" alt="Heavy light flooded across the landscape, cloaking everything in deep crimson. (please WotC don't sue)" width="300"/>
+</div>
