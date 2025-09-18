@@ -1,6 +1,9 @@
-# Bloodmoon
 
-![Heavy light flooded across the landscape, cloaking everything in deep crimson. (please WotC don't sue)](images/heavy_light_flooded.png)
+<div align="center">
+<img src="images/heavy_light_flooded.png" alt="Heavy light flooded across the landscape, cloaking everything in deep crimson. (please WotC don't sue)" width="200"/>
+</div>
+
+# Bloodmoon
 
 A Python library for analyzing data from the Wide Field Monitor (WFM) coded mask instrument. Bloodmoon provides tools for:
 - Image reconstruction
