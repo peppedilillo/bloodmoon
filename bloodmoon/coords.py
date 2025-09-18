@@ -21,7 +21,6 @@ if TYPE_CHECKING:
 
 from .io import SimulationDataLoader
 from .types import BinsEquatorial
-from .types import BinsRectangular
 from .types import CoordEquatorial
 
 

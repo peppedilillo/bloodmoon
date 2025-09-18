@@ -32,23 +32,6 @@ from .types import BinsRectangular
 from .types import UpscaleFactor
 
 
-def _fold(
-    ml: FITS_rec,
-    mask_bins: BinsRectangular,
-) -> npt.NDArray:
-    """
-    Convert mask data from FITS record to 2D binned array.
-
-    Args:
-        ml: FITS record containing mask data
-        mask_bins: Binning structure for the mask
-
-    Returns:
-        2D array containing binned mask data
-    """
-    return binned_statistic_2d(ml["X"], ml["Y"], ml["VAL"], statistic="max", bins=[mask_bins.x, mask_bins.y])[0].T
-
-
 def _bisect_interval(
     a: npt.NDArray,
     start: float,

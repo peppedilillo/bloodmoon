@@ -261,8 +261,8 @@ def load_from_fits(filepath: str | Path) -> tuple:
     )
 
     get_mask = lambda: _fold(fits.getdata(filepath, ext=2), mask_bins).astype(int)
-    get_decoder = lambda: _fold(fits.getdata(filepath, ext=3), mask_bins).astype(int)
-    get_bulk = lambda: _fold(fits.getdata(filepath, ext=4), mask_bins).astype(int)
+    get_decoder = lambda: _fold(fits.getdata(filepath, ext=3), mask_bins)
+    get_bulk = lambda: _fold(fits.getdata(filepath, ext=4), mask_bins)
     return get_mask, get_decoder, get_bulk, specs
 
 
