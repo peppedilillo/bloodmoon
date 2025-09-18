@@ -15,11 +15,9 @@ from functools import cached_property
 from pathlib import Path
 from typing import Callable
 
-from astropy.io.fits.fitsrec import FITS_rec
 import numpy as np
 import numpy.typing as npt
 from scipy.signal import correlate
-from scipy.stats import binned_statistic_2d
 
 from .coords import pos2shift
 from .images import _interp
