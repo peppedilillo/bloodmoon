@@ -18,6 +18,7 @@ from typing import Callable
 import numpy as np
 import numpy.typing as npt
 from scipy.signal import correlate
+from toolz.curried import get_in
 
 from .coords import pos2shift
 from .images import _interp
@@ -138,20 +139,14 @@ class CodedMaskCamera:
     @cached_property
     def shape_detector(self) -> tuple[int, int]:
         """Shape of the detector array (rows, columns)."""
-        xmin = np.floor(self.specs.detector_minx / (self.specs.mask_deltax / self.upscale_f.x))
-        xmax = np.ceil(self.specs.detector_maxx / (self.specs.mask_deltax / self.upscale_f.x))
-        ymin = np.floor(self.specs.detector_miny / (self.specs.mask_deltay / self.upscale_f.y))
-        ymax = np.ceil(self.specs.detector_maxy / (self.specs.mask_deltay / self.upscale_f.y))
-        return int(ymax - ymin), int(xmax - xmin)
+        return len(self.bins_detector.y) - 1, len(self.bins_detector.x) - 1
 
     @cached_property
     def shape_mask(self) -> tuple[int, int]:
         """Shape of the mask array (rows, columns)."""
         # there is no need for this since we can just `mask.shape` but since we have the other already..
-        return (
-            int((self.specs.mask_maxy - self.specs.mask_miny) / (self.specs.mask_deltay / self.upscale_f.y)),
-            int((self.specs.mask_maxx - self.specs.mask_minx) / (self.specs.mask_deltax / self.upscale_f.x)),
-        )
+        return len(self.bins_mask.y) - 1, len(self.bins_mask.x) - 1
+
 
     @cached_property
     def shape_sky(self) -> tuple[int, int]:
@@ -258,6 +253,10 @@ class CodedMaskCamera:
         bins = self._bins_mask(self.upscale_f)
         xmin, xmax = _bisect_interval(bins.x, self.specs.detector_minx, self.specs.detector_maxx)
         ymin, ymax = _bisect_interval(bins.y, self.specs.detector_miny, self.specs.detector_maxy)
+        # why `xmin: xmax` rather than `xmin: xmax + 1`?
+        # `bins.x[xmin:xmax + 1]` is the smallest subarray of `bins.x` spanning `det_minx` and `det_maxx`
+        # the bin edges number of the subarray is `xmax - xmin + 1`.
+        # the number of matrix elements in the subarray is `xmax - xmin + 1 - 1 == xmax - xmin`
         return _upscale(bulk, *self.upscale_f)[ymin:ymax, xmin:xmax]
 
     @cached_property
@@ -290,7 +289,7 @@ def codedmask(
         NotImplementedError: If mask_filepath is not a valid FITS file
     """
     if validate_fits(mask_filepath):
-        mask, decoder, bulk, specs_dict = load_from_fits(mask_filepath)
+        get_mask, get_decoder, get_bulk, specs_dict = load_from_fits(mask_filepath)
         specs = CodedMaskSpecs(**specs_dict)
         if not (
             # fmt: off
@@ -306,9 +305,9 @@ def codedmask(
             raise ValueError("Upscale factors must be positive integers.")
 
         return CodedMaskCamera(
-            get_mask=mask,
-            get_decoder=decoder,
-            get_bulk=bulk,
+            get_mask=get_mask,
+            get_decoder=get_decoder,
+            get_bulk=get_bulk,
             specs=specs,
             upscale_f=UpscaleFactor(x=upscale_x, y=upscale_y),
         )
