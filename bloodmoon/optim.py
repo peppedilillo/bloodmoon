@@ -29,8 +29,8 @@ from .mask import count
 from .mask import cutout
 from .mask import decode
 from .mask import interpmax
-from .mask import snratio
-from .mask import variance
+from .mask import sky_variance
+from .mask import sky_significance
 
 
 def _modsech(
@@ -853,11 +853,13 @@ def iros(
         # variance is clipped to improve numerical stability for off-axis sources,
         # which may result in very few counts.
         # TODO: improve on this only sorting matrix elements over a threshold.
-        snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skymaps, varmaps))
+        snrs = tuple(
+            sky_significance(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skymaps, varmaps)
+        )
         return snrs
 
     detectors = tuple(count(camera, sdl.data)[0] for sdl in sdls)
-    variances = tuple(variance(camera, d) for d in detectors)
+    variances = tuple(sky_variance(camera, d) for d in detectors)
     skies = tuple(decode(camera, d) for d in detectors)
     for i in range(max_iterations):
         snrs = compute_snratios(skies, variances)

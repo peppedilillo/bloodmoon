@@ -19,10 +19,10 @@ count : Function
 decode : Function
     Reconstructs sky images using balanced cross-correlation
 
-variance : Function
+sky_variance : Function
     Computes balanced sky image variance
 
-snratio : Function
+sky_significance : Function
     Computes balanced sky image signal-to-noise ratio
 
 model_shadowgram : Function
@@ -50,8 +50,8 @@ from .mask import CodedMaskSpecs
 from .mask import count
 from .mask import cutout
 from .mask import decode
-from .mask import snratio
-from .mask import variance
+from .mask import sky_variance
+from .mask import sky_significance
 from .optim import iros
 from .optim import model_shadowgram
 from .optim import model_sky

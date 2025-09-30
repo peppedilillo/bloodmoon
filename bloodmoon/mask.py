@@ -28,6 +28,7 @@ from .io import load_from_fits
 from .io import validate_fits
 from .types import BinsRectangular
 from .types import UpscaleFactor
+from .utils import detector_solid_angle
 
 
 def _bisect_interval(
@@ -358,48 +359,69 @@ def decode(
     return cc_bal
 
 
-def variance(
+def sky_variance(
     camera: CodedMaskCamera,
     detector: npt.NDArray,
 ) -> npt.NDArray:
     """
-    Reconstruct balanced sky variance from detector counts.
+    Reconstructs balanced sky variance from detector image by using
+    the expected photon counts, to neglect Poisson fluctuations.
 
     Args:
-        camera: CodedMaskCamera object containing mask and decoder patterns
-        detector: 2D array of detector counts
+        camera (CodedMaskCamera):
+            Camera instance containing mask and decoder patterns.
+        detector (NDArray):
+            2D array of detector counts.
 
     Returns:
-        Variance map of the reconstructed sky image
+        output (NDArray):
+            Balanced variance map of the reconstructed sky image.
+            To conserve the observed total counts, the output array
+            is clipped in the range `[1e-8, detector.sum()]`.
+    
+    ## Notes:
+        - CFR with:
+            * https://github.com/yuri-evangelista/CodedMasks/blob/26a5bb2fa08e37c645f85d55a3a1ef038fe7497d/mask_utils/imaging_utils.py#L134
     """
-    cc = correlate(camera.decoder, detector, mode="full")
-    var = correlate(np.square(camera.decoder), detector, mode="full")
+    # retrieve total detector counts and total active elements
     sum_det, sum_bulk = map(np.sum, (detector, camera.bulk))
-    var_bal = var + np.square(camera.balancing) * sum_det / np.square(sum_bulk) - 2 * cc * camera.balancing / sum_bulk
-    return var_bal
+
+    # compute expected counts for the detector image
+    # - the expected counts array `Lambda` can be built as the product between
+    #   a normalised matrix `Omega` representing the solid angle seen by each
+    #   active pixel; and the total observed detector counts (i.e., `sum_det`)
+    Omega = detector_solid_angle(camera)
+    Lambda = sum_det * Omega / Omega.sum()
+
+    # balanced variance components
+    var = correlate(np.square(camera.decoder), Lambda, mode="full")
+    bal = np.square(camera.balancing) * sum_det / np.square(sum_bulk)
+    covar = correlate(camera.decoder, Lambda, mode="full")
+
+    var_bal = (
+        var + bal - 2 * covar * camera.balancing / sum_bulk
+    )
+    return np.clip(var_bal, a_min=1e-8, a_max=detector.sum())
 
 
-def snratio(
+def sky_significance(
     sky: npt.NDArray,
     var: npt.NDArray,
 ) -> npt.NDArray:
     """
-    Calculate signal-to-noise ratio from sky signal and variance arrays.
+    Computes signal-to-noise ratio from sky signal and variance arrays.
 
     Args:
-        sky: Array containing sky signal values.
-        var: Array containing variance values. Negative values are clipped to 0.
+        sky (NDArray):
+            Sky signal values.
+        var (NDArray):
+            Sky variance values.
 
     Returns:
-        NDArray: Signal-to-noise ratio calculated as sky/sqrt(variance).
-
-    Notes:
-        - Variance's boundary frames with elements close to zero are replaced with infinity.
-        - Variance's minimum is clipped at 0 if any negative value are present in the array.
+        output (NDArray):
+            Sky significance calculated as `sky / sqrt(variance)`.
     """
-    variance_clipped = np.clip(var, a_min=0.0, a_max=None) if np.any(var < 0) else var
-    variance_unframed = _unframe(variance_clipped, value=np.inf)
-    return sky / np.sqrt(variance_unframed)
+    return sky / np.sqrt(var)
 
 
 def psf(camera: CodedMaskCamera) -> npt.NDArray:
