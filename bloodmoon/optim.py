@@ -119,8 +119,8 @@ def apply_vignetting(
 
               \       \  \
     ___________\       \  \____________
-                \       \  x            MASK ELEMENT
-    ___________  \       \ _x___________
+               |\       \ |x            MASK ELEMENT
+    ___________| \       \|_x___________
                   \       \  x
                    \       \  x
                     \       \  x
@@ -144,22 +144,43 @@ def apply_vignetting(
         - The mask thickness parameter from the camera model determines the strength
           of the effect
     """
+    def project_mask_thickness(shift: float, bin_dim: float) -> float:
+        """
+        Projects the mask thickness on the mask binning elements, and
+        corrects the projection value to allows for correct erosion
+        of the mask physical elements starting from the pixels' edges.
+        """
+        # since the mask detector distance is defined as the distance between the
+        # detector top and the mask top, erosion shall cut on the left-side of the
+        # shadowgram when sources have negative `angle`.
+        # if the mask detector distance was defined as the distance between the
+        # detector top and the mask bottom, erosion should have been applied to the
+        # right side, i.e. `proj` should be multiplied by -1.
+        angle = np.arctan(shift / camera.specs.mask_detector_distance)
+        proj = camera.specs.mask_thickness * np.tan(angle)
+        shift_px = shift / bin_dim
+        # the mask thickness projection has to be corrected by considering the
+        # erosion pixel start point, due to the discretisation of the projection
+        # https://github.com/yuri-evangelista/CodedMasks/blob/main/mask_050_1040x17/new_erosion_20251024.ipynb
+        bin_erosion_start = (1.0 - abs(shift_px - int(shift_px))) * bin_dim
+        return proj + np.sign(proj) * bin_erosion_start
+    
     bins = camera.bins_detector
+    bin_dim_x, bin_dim_y = (
+        bins.x[1] - bins.x[0],
+        bins.y[1] - bins.y[0],
+    )
 
-    angle_x_rad = np.arctan(shift_x / camera.specs.mask_detector_distance)
-    red_factor = camera.specs.mask_thickness * np.tan(angle_x_rad)
-    # since the mask detector distance is defined as the distance between the
-    # detector top and the mask top, erosion shall cut on the left-side of the
-    # shadowgram when sources have negative `angle_x_rad`.
-    # if the mask detector distance was defined as the distance between the
-    # detector top and the mask bottom, erosion should have been applied to the
-    # right side, i.e. `red_factor` should be multiplied by -1.
-    sg1 = _erosion(shadowgram, bins.x[1] - bins.x[0], red_factor)
+    red_factor_x = project_mask_thickness(shift_x, bin_dim_x)
+    sg_x = _erosion(shadowgram, bin_dim_x, red_factor_x)
 
-    angle_y_rad = np.arctan(shift_y / camera.specs.mask_detector_distance)
-    red_factor = camera.specs.mask_thickness * np.tan(angle_y_rad)
-    sg2 = _erosion(shadowgram.T, bins.y[1] - bins.y[0], red_factor)
-    return sg1 * sg2.T
+    # - we apply the y-axis erosion to `sg_x`, otherwise the decimal
+    #   values of the input shifted shadowgram would be squared
+    # - the erosion on the two axes is still independent, as it must be
+    red_factor_y = project_mask_thickness(shift_y, bin_dim_y)
+    sg_y = _erosion(sg_x.T, bin_dim_y, red_factor_y)
+
+    return sg_y.T
 
 
 @lru_cache(maxsize=1)

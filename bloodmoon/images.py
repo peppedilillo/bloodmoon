@@ -583,8 +583,6 @@ def _erosion(
     2D matrix erosion for simulating finite thickness effect in shadow projections.
     It takes a mask array and "thins" the mask elements across the columns' direction.
 
-    Comes with NO safeguards: setting cuts larger than step may remove slits or make them negative.
-
     ⢯⣽⣿⣿⣿⠛⠉⠀⠀⠉⠉⢛⢟⡻⣟⡿⣿⢿⣿⣿⢿⣻⣟⡿⣟⡿⣿⣻⣟⣿⣟⣿⣻⣟⡿⣽⣻⠿⣽⣻⢟⡿⣽⢫⢯⡝
     ⢯⣞⣷⣻⠤⢀⠀⠀⠀⠀⠀⠀⠀⠑⠌⢳⡙⣮⢳⣭⣛⢧⢯⡽⣏⣿⣳⢟⣾⣳⣟⣾⣳⢯⣽⣳⢯⣟⣷⣫⢿⣝⢾⣫⠗⡜
     ⡿⣞⡷⣯⢏⡴⢀⠀⠀⣀⣤⠤⠀⠀⠀⠀⠑⠈⠇⠲⡍⠞⡣⢝⡎⣷⠹⣞⢧⡟⣮⢷⣫⢟⡾⣭⢷⡻⢶⣏⣿⢺⣏⢮⡝⢌
@@ -621,22 +619,29 @@ def _erosion(
     Notes:
         * See tests for usage examples.
     """
-    if not np.issubdtype(arr.dtype, np.integer):
-        raise ValueError(
-            "Input array must be of integer type. "
-            "Hint: make sure that 1. your mask dtype is integer, and 2. it only contains ones and zeros."
-        )
-
+    # check if there's erosion
+    if not cut:
+        return arr
+    
     # number of bins to cut
     ncuts = int(cut / step)
-    cutted = arr * (arr & _shift(arr, (0, ncuts))) if ncuts else arr
+    arr_mask = (arr > 0) & (_shift(arr, 0, ncuts) > 0)
+    cutted = arr * arr_mask if ncuts else arr
 
     # array indexes to be fractionally reduced:
-    #   - the bin with the decimal values is the one
-    #     to the left or right wrt the cutted bins
+    # - the bin with the decimal values is the one
+    #   to the left or right wrt the cutted bins
+    # - since `arr` may have values in [0, 1], we
+    #   look at the element greater than zero to
+    #   perform the mask elements erosion
+    # - to NOT risk having negative values, the
+    #   erosion value is not subtracted directly
     erosion_value = abs(cut / step - ncuts)
-    border = (cutted - _shift(cutted, (0, int(np.sign(cut))))) > 0
-    return cutted - border * erosion_value
+    cutted_mask = (
+        np.array((cutted > 0), dtype=int) - np.array((_shift(cutted, 0, int(np.sign(cut))) > 0), dtype=int)
+    )
+    border = (cutted_mask > 0)
+    return cutted * (1.0 - border * erosion_value)
 
 
 def _unframe(a: npt.NDArray, value: float = 0.0) -> npt.NDArray:
