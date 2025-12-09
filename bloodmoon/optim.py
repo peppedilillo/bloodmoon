@@ -8,9 +8,8 @@ This module provides algorithms for:
 - Model fitting with instrumental effects
 """
 
-from bisect import bisect
 from functools import lru_cache
-from typing import Callable, Iterable, Literal, OrderedDict
+from typing import Callable, Iterable, Literal
 import warnings
 
 from numpy import typing as npt
@@ -20,9 +19,9 @@ from scipy.optimize import minimize
 from scipy.signal import convolve
 
 from .images import _erosion
-from .images import _rbilinear
 from .images import _rbilinear_relative
 from .images import _shift
+from .images import fshift
 from .io import SimulationDataLoader
 from .mask import _detector_footprint
 from .mask import CodedMaskCamera
@@ -218,14 +217,62 @@ def _detector_footprint_cached(camera: CodedMaskCamera):
     return _detector_footprint(camera)
 
 
+def _mask_pattern_projection(
+    camera: CodedMaskCamera,
+    shift_x: float,
+    shift_y: float,
+    vignetting: bool = True,
+    psfy: bool = True,
+) -> npt.NDArray:
+    """
+    Generates the mask pattern projection for a point source by applying the
+    fractional shift of the camera mask array (mask pattern projection), and
+    the instrumental effects (i.e., vignetting and detector spatial resolution).
+
+    To process the mask pattern, a specific operation order is followed:
+        * first, the mask array is shifted
+        * second, the vignetting is applied to the shifted array
+        * lastly, the detector sp. res. is applied
+
+    Args:
+        camera: CodedMaskCamera instance containing all geometric parameters
+        shift_x: Source position x-coordinate in sky-shift space (mm)
+        shift_y: Source position y-coordinate in sky-shift space (mm)
+        vignetting: simulates vignetting effects
+        psfy: simulates detector reconstruction effects
+
+    Returns:
+        Processed mask pattern array for the source.
+    """
+    # shift mask pattern
+    pxdimy, pxdimx = (
+        camera.specs.mask_deltay / camera.upscale_f.y,
+        camera.specs.mask_deltax / camera.upscale_f.x,
+    )
+    fr, fc = (
+        (-1.0) * shift_y / pxdimy,
+        (-1.0) * shift_x / pxdimx,
+    )
+    mask_shifted = fshift(camera.mask.astype(float), fr, fc)
+    # apply vignetting effect
+    mask_vignetted = (
+        apply_vignetting(camera, mask_shifted, shift_x, shift_y)
+        if vignetting else mask_shifted
+    )
+    # apply detector spatial resolution effect
+    mask_projected = (
+        apply_detector_resolution(camera, mask_vignetted)
+        if psfy else mask_vignetted
+    )
+    return mask_projected
+
+
 def model_shadowgram(
     camera: CodedMaskCamera,
     shift_x: float,
     shift_y: float,
     vignetting: bool = True,
     psfy: bool = True,
-    normalize: bool = True,
-    interp: bool = True,
 ) -> npt.NDArray:
     """
     Generates a normalized shadowgram for a point source.
@@ -236,13 +283,11 @@ def model_shadowgram(
     - PSF convolution over y axis
 
     Args:
+        camera: CodedMaskCamera instance containing all geometric parameters
         shift_x: Source position x-coordinate in sky-shift space (mm)
         shift_y: Source position y-coordinate in sky-shift space (mm)
-        camera: CodedMaskCamera instance containing all geometric parameters
         vignetting: simulates vignetting effects
         psfy: simulates detector reconstruction effects
-        normalize: normalize shadowgram sum to 1
-        interp: applies rbilinear interpolation for fractional shifts
 
     Returns:
         2D array representing the modeled detector image from the source
@@ -250,47 +295,15 @@ def model_shadowgram(
     Notes:
         * Results are normalized, i.e. sums up to one.
     """
-
-    def process_mask(shift_x, shift_y):
-        mask_maybe_vignetted = (
-            apply_vignetting(
-                camera,
-                camera.mask,
-                shift_x,
-                shift_y,
-            )
-            if vignetting
-            else camera.mask
-        )
-        mask_maybe_vignetted_maybe_psfy = (
-            convolve(
-                mask_maybe_vignetted,
-                _wfm_psfy_kernel_cached(camera),
-                mode="same",
-            )
-            if psfy
-            else mask_maybe_vignetted
-        )
-        return mask_maybe_vignetted_maybe_psfy
-
-    # relative component map
-    if interp:
-        components = _rbilinear(shift_x, shift_y, camera.bins_sky.x, camera.bins_sky.y)
-    else:
-        c_i, c_j = (bisect(camera.bins_sky.y, shift_y) - 1), bisect(camera.bins_sky.x, shift_x) - 1
-        components = OrderedDict([((c_i, c_j), 1.0)])
-
-    n, m = camera.shape_sky
-    detector = np.zeros(camera.shape_detector)
+    # project mask pattern from point source
+    sg = _mask_pattern_projection(
+        camera, shift_x, shift_y, vignetting, psfy,
+    )
+    # extract normalised detector image
     i_min, i_max, j_min, j_max = _detector_footprint_cached(camera)
-    for (c_i, c_j), weight in components.items():
-        r, c = (n // 2 - c_i), (m // 2 - c_j)
-        mask_p = process_mask(camera.bins_sky.x[c_j], camera.bins_sky.y[c_i])  # mask processed
-        sg = _shift(mask_p, (r, c))  # mask shifted processed
-        detector += sg[i_min:i_max, j_min:j_max] * weight
+    detector = sg[i_min:i_max, j_min:j_max]
     detector *= camera.bulk
-    if normalize:
-        detector /= np.sum(detector)
+    detector /= np.sum(detector)
     return detector
 
 
@@ -312,27 +325,21 @@ def model_sky(
     - Flux scaling
 
     Args:
+        camera: CodedMaskCamera instance containing all geometric parameters
         shift_x: Source position x-coordinate in sky-shift space (mm)
         shift_y: Source position y-coordinate in sky-shift space (mm)
         fluence: Source intensity/fluence value
-        camera: CodedMaskCamera instance containing all geometric parameters
         vignetting: simulates vignetting effects
         psfy: simulates detector reconstruction effects
 
     Returns:
         2D array representing the modeled sky reconstruction after all effects
         and processing steps have been applied
-
-    Notes:
-        - For optimization, consider using the dedicated, cached function of `optim.py`
     """
-    return (
-        decode(
-            camera,
-            model_shadowgram(camera, shift_x, shift_y, vignetting=vignetting, psfy=psfy),
-        )
-        * fluence
+    detector = model_shadowgram(
+        camera, shift_x, shift_y, vignetting=vignetting, psfy=psfy,
     )
+    return decode(camera, detector * fluence)
 
 
 def _ModelFluence(  # noqa
