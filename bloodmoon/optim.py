@@ -15,6 +15,7 @@ import warnings
 
 from numpy import typing as npt
 import numpy as np
+from scipy.ndimage import gaussian_filter
 from scipy.optimize import minimize
 from scipy.signal import convolve
 
@@ -23,7 +24,6 @@ from .images import _rbilinear
 from .images import _rbilinear_relative
 from .images import _shift
 from .io import SimulationDataLoader
-from .mask import _bisect_interval
 from .mask import _detector_footprint
 from .mask import CodedMaskCamera
 from .mask import count
@@ -68,18 +68,19 @@ def _wfm_psfy(x: npt.NDArray) -> npt.NDArray:
         numpy array or value
     """
     PSFY_WFM_PARAMS = {
-        "center": 0,
-        "alpha": 0.3214,
-        "beta": 0.6246,
+        "norm": 1.0,
+        "center": 0.0,
+        "alpha": 0.5459735904725987,
+        "beta": 0.7363355668833482,
     }
-    return _modsech(x, norm=1, **PSFY_WFM_PARAMS)
+    return _modsech(x, **PSFY_WFM_PARAMS)
 
 
 def _wfm_psfy_kernel(camera: CodedMaskCamera) -> npt.NDArray:
     """
-    Returns PSF convolution kernel.
-    At present, it ignores the `x` direction, since PSF characteristic lenght is much shorter
-    than typical bin size, even at moderately large upscales.
+    Returns PSF normalised convolution kernel.
+    At present, it ignores the `x` direction, since PSF characteristic lenght
+    is much shorter than typical bin size, even at moderately large upscales.
 
     Args:
         camera: a CodedMaskCamera object.
@@ -87,19 +88,47 @@ def _wfm_psfy_kernel(camera: CodedMaskCamera) -> npt.NDArray:
     Returns:
         A column array convolution kernel.
     """
-    bins = camera.bins_detector
-    min_bin, max_bin = _bisect_interval(bins.y, -camera.specs.slit_deltay, camera.specs.slit_deltay)
-    bin_edges = bins.y[min_bin : max_bin + 1]
-    midpoints = (bin_edges[1:] + bin_edges[:-1]) / 2
-    kernel = _wfm_psfy(midpoints).reshape(len(midpoints), -1)
-    kernel = kernel / np.sum(kernel)
-    return kernel
+    PSFY_GAUSS_PARAMS = {
+        "sigma": 0.17749677955602094,
+        "mode": 'constant',
+        "cval": 0.0,
+    }
+
+    # we take a whole slit to have a good kernel spatial extension
+    px_ydim = camera.specs.mask_deltay / camera.upscale_f.y
+    slit_dim = camera.specs.slit_deltay
+    # the kernel must have the same binning as the mask elements
+    bins = np.linspace(-slit_dim, slit_dim, int(2 * slit_dim / px_ydim) + 1)
+    kernel = _wfm_psfy(bins).reshape(len(bins), -1)
+    # from tests, the modsech should be modulated with a Gaussian
+    psfy = gaussian_filter(kernel, **PSFY_GAUSS_PARAMS)
+    return psfy / np.sum(psfy)
 
 
 @lru_cache(maxsize=1)
 def _wfm_psfy_kernel_cached(camera: CodedMaskCamera):
     """Caching helper."""
     return _wfm_psfy_kernel(camera)
+
+
+def apply_detector_resolution(
+    camera: CodedMaskCamera,
+    shadowgram: npt.NDArray,
+) -> npt.NDArray:
+    """
+    Applies finite detector spatial resolution effects to a shadowgram.
+
+    Args:
+        camera: CodedMaskCamera instance containing mask and detector geometry
+        shadowgram: 2D array representing the detector shadowgram
+    
+    Returns:
+        2D array representing the detector shadowgram
+        with spatial resolution effects applied.
+    """
+    return convolve(
+        shadowgram, _wfm_psfy_kernel_cached(camera), mode="same",
+    )
 
 
 def apply_vignetting(
